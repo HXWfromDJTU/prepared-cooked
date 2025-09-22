@@ -7,9 +7,12 @@ class GameData {
     initializeData() {
         // 游戏配置
         this.config = {
-            gameWidth: 1024,
-            gameHeight: 768,
+            gameWidth: 800,
+            gameHeight: 600,
             gameTime: 180, // 3分钟 = 180秒
+            gridSize: 40, // 网格大小
+            gridWidth: 20, // 网格宽度 (800/40)
+            gridHeight: 15, // 网格高度 (600/40)
             difficulties: {
                 easy: {
                     orderFrequency: 15000, // 15秒一个订单
@@ -124,17 +127,87 @@ class GameData {
             }
         };
 
-        // 厨房布局配置
+        // 厨房布局配置 - 回字形设计
         this.kitchenLayout = {
-            microwaves: [
-                { x: 200, y: 300, id: 'microwave1' },
-                { x: 300, y: 300, id: 'microwave2' }
+            // 外圈通道区域 (厨师可行走)
+            outerWalkway: { gridX: 1, gridY: 1, gridWidth: 18, gridHeight: 13 },
+            // 内圈通道区域 (厨师可行走)  
+            innerWalkway: { gridX: 6, gridY: 6, gridWidth: 8, gridHeight: 3 },
+            
+            playerStart: { gridX: 10, gridY: 7 }, // 内圈通道中央
+            
+            // 回字形工作台布局 - 外圈
+            workstations: [
+                // === 外圈上方 ===
+                { gridX: 2, gridY: 2, gridWidth: 2, gridHeight: 1, type: 'ingredient_storage', name: '羊排', ingredientId: 'lamb_chop', id: 'storage_lamb_chop' },
+                { gridX: 4, gridY: 2, gridWidth: 2, gridHeight: 1, type: 'ingredient_storage', name: '牛肋排', ingredientId: 'beef_ribs', id: 'storage_beef_ribs' },
+                { gridX: 6, gridY: 2, gridWidth: 2, gridHeight: 1, type: 'ingredient_storage', name: '五花肉', ingredientId: 'pork_belly', id: 'storage_pork_belly' },
+                { gridX: 8, gridY: 2, gridWidth: 2, gridHeight: 1, type: 'ingredient_storage', name: '鸡胸肉', ingredientId: 'chicken_breast', id: 'storage_chicken_breast' },
+                { gridX: 10, gridY: 2, gridWidth: 2, gridHeight: 1, type: 'ingredient_storage', name: '白菜', ingredientId: 'cabbage', id: 'storage_cabbage' },
+                { gridX: 12, gridY: 2, gridWidth: 2, gridHeight: 1, type: 'ingredient_storage', name: '土豆', ingredientId: 'potato', id: 'storage_potato' },
+                { gridX: 14, gridY: 2, gridWidth: 2, gridHeight: 1, type: 'ingredient_storage', name: '蘑菇', ingredientId: 'mushroom', id: 'storage_mushroom' },
+                { gridX: 16, gridY: 2, gridWidth: 2, gridHeight: 1, type: 'ingredient_storage', name: '洋葱', ingredientId: 'onion', id: 'storage_onion' },
+                
+                // === 外圈右侧 ===
+                { gridX: 17, gridY: 4, gridWidth: 2, gridHeight: 1, type: 'microwave', name: '微波炉1', id: 'microwave1' },
+                { gridX: 17, gridY: 6, gridWidth: 2, gridHeight: 1, type: 'microwave', name: '微波炉2', id: 'microwave2' },
+                { gridX: 17, gridY: 8, gridWidth: 2, gridHeight: 1, type: 'cooking_counter', name: '料理台', id: 'counter_right1' },
+                { gridX: 17, gridY: 10, gridWidth: 2, gridHeight: 1, type: 'cooking_counter', name: '料理台', id: 'counter_right2' },
+                
+                // === 外圈下方 ===
+                { gridX: 16, gridY: 12, gridWidth: 2, gridHeight: 1, type: 'serving', name: '上菜区', id: 'serving' },
+                { gridX: 14, gridY: 12, gridWidth: 2, gridHeight: 1, type: 'cooking_counter', name: '料理台', id: 'counter_bottom1' },
+                { gridX: 12, gridY: 12, gridWidth: 2, gridHeight: 1, type: 'cooking_counter', name: '料理台', id: 'counter_bottom2' },
+                { gridX: 10, gridY: 12, gridWidth: 2, gridHeight: 1, type: 'cooking_counter', name: '料理台', id: 'counter_bottom3' },
+                { gridX: 8, gridY: 12, gridWidth: 2, gridHeight: 1, type: 'cooking_counter', name: '料理台', id: 'counter_bottom4' },
+                { gridX: 6, gridY: 12, gridWidth: 2, gridHeight: 1, type: 'ingredient_storage', name: '米饭', ingredientId: 'rice', id: 'storage_rice' },
+                { gridX: 4, gridY: 12, gridWidth: 2, gridHeight: 1, type: 'ingredient_storage', name: '面条', ingredientId: 'noodles', id: 'storage_noodles' },
+                { gridX: 2, gridY: 12, gridWidth: 2, gridHeight: 1, type: 'ingredient_storage', name: '胡萝卜', ingredientId: 'carrot', id: 'storage_carrot' },
+                
+                // === 外圈左侧 ===
+                { gridX: 1, gridY: 10, gridWidth: 2, gridHeight: 1, type: 'ingredient_storage', name: '调料包', ingredientId: 'sauce', id: 'storage_sauce' },
+                { gridX: 1, gridY: 8, gridWidth: 2, gridHeight: 1, type: 'ingredient_storage', name: '奶酪', ingredientId: 'cheese', id: 'storage_cheese' },
+                { gridX: 1, gridY: 6, gridWidth: 2, gridHeight: 1, type: 'cooking_counter', name: '料理台', id: 'counter_left1' },
+                { gridX: 1, gridY: 4, gridWidth: 2, gridHeight: 1, type: 'cooking_counter', name: '料理台', id: 'counter_left2' },
+                
+                // === 内圈工作台 ===
+                { gridX: 4, gridY: 5, gridWidth: 2, gridHeight: 1, type: 'cooking_counter', name: '料理台', id: 'counter_inner1' },
+                { gridX: 6, gridY: 4, gridWidth: 2, gridHeight: 1, type: 'cooking_counter', name: '料理台', id: 'counter_inner2' },
+                { gridX: 8, gridY: 4, gridWidth: 2, gridHeight: 1, type: 'cooking_counter', name: '料理台', id: 'counter_inner3' },
+                { gridX: 10, gridY: 4, gridWidth: 2, gridHeight: 1, type: 'cooking_counter', name: '料理台', id: 'counter_inner4' },
+                { gridX: 12, gridY: 4, gridWidth: 2, gridHeight: 1, type: 'cooking_counter', name: '料理台', id: 'counter_inner5' },
+                { gridX: 14, gridY: 5, gridWidth: 2, gridHeight: 1, type: 'cooking_counter', name: '料理台', id: 'counter_inner6' },
+                { gridX: 14, gridY: 7, gridWidth: 2, gridHeight: 1, type: 'cooking_counter', name: '料理台', id: 'counter_inner7' },
+                { gridX: 12, gridY: 8, gridWidth: 2, gridHeight: 1, type: 'cooking_counter', name: '料理台', id: 'counter_inner8' },
+                { gridX: 10, gridY: 8, gridWidth: 2, gridHeight: 1, type: 'cooking_counter', name: '料理台', id: 'counter_inner9' },
+                { gridX: 8, gridY: 8, gridWidth: 2, gridHeight: 1, type: 'cooking_counter', name: '料理台', id: 'counter_inner10' },
+                { gridX: 6, gridY: 8, gridWidth: 2, gridHeight: 1, type: 'cooking_counter', name: '料理台', id: 'counter_inner11' },
+                { gridX: 4, gridY: 7, gridWidth: 2, gridHeight: 1, type: 'cooking_counter', name: '料理台', id: 'counter_inner12' }
             ],
-            storage: { x: 100, y: 200, id: 'storage' },
-            workstation: { x: 500, y: 300, id: 'workstation' },
-            servingArea: { x: 700, y: 200, id: 'serving' },
-            washArea: { x: 400, y: 500, id: 'wash' },
-            playerStart: { x: 400, y: 400 }
+            
+            // 兼容旧版本的快速访问 (转换为像素坐标)
+            microwaves: [
+                { x: 16 * 40 + 20, y: 4 * 40 + 20, id: 'microwave1' },
+                { x: 16 * 40 + 20, y: 6 * 40 + 20, id: 'microwave2' }
+            ],
+            workstation: { x: 12 * 40 + 20, y: 12 * 40 + 20, id: 'workstation' },
+            servingArea: { x: 8 * 40 + 20, y: 12 * 40 + 20, id: 'serving' }
+        };
+        
+        // 网格转像素坐标的辅助方法
+        this.gridToPixel = (gridX, gridY) => {
+            return {
+                x: gridX * this.config.gridSize + this.config.gridSize / 2,
+                y: gridY * this.config.gridSize + this.config.gridSize / 2
+            };
+        };
+        
+        // 像素转网格坐标的辅助方法
+        this.pixelToGrid = (x, y) => {
+            return {
+                gridX: Math.floor(x / this.config.gridSize),
+                gridY: Math.floor(y / this.config.gridSize)
+            };
         };
     }
 

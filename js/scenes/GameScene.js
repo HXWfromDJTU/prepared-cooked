@@ -71,59 +71,285 @@ class GameScene extends Phaser.Scene {
 
     drawKitchenAreas() {
         const layout = gameData.kitchenLayout;
+        const config = gameData.config;
         
-        // 微波炉区域
-        layout.microwaves.forEach((microwave, index) => {
-            const microwaveRect = this.add.rectangle(microwave.x, microwave.y, 80, 60, 0x8B4513);
-            microwaveRect.setStrokeStyle(2, 0x654321);
-            
-            this.add.text(microwave.x, microwave.y - 40, `微波炉${index + 1}`, {
-                fontSize: '12px',
-                fontFamily: 'Courier New',
-                color: '#8B4513'
-            }).setOrigin(0.5);
+        // 绘制网格线
+        this.drawGridLines();
+        
+        // 绘制回字形通道区域
+        this.drawWalkwayAreas(layout, config);
+        
+        // 绘制网格化工作台
+        layout.workstations.forEach((station, index) => {
+            this.drawGridWorkstation(station);
         });
-
-        // 储存区
-        const storageRect = this.add.rectangle(layout.storage.x, layout.storage.y, 100, 80, 0x90EE90);
-        storageRect.setStrokeStyle(2, 0x228B22);
-        this.add.text(layout.storage.x, layout.storage.y - 50, '食材储存', {
-            fontSize: '12px',
+        
+        // 添加厨房标题
+        this.add.text(config.gameWidth / 2, 30, '西贝莜面村 - 预制菜厨房', {
+            fontSize: '18px',
             fontFamily: 'Courier New',
-            color: '#8B4513'
-        }).setOrigin(0.5);
-
-        // 工作台
-        const workstationRect = this.add.rectangle(layout.workstation.x, layout.workstation.y, 100, 60, 0xDEB887);
-        workstationRect.setStrokeStyle(2, 0xCD853F);
-        this.add.text(layout.workstation.x, layout.workstation.y - 40, '组装台', {
-            fontSize: '12px',
-            fontFamily: 'Courier New',
-            color: '#8B4513'
-        }).setOrigin(0.5);
-
-        // 上菜区
-        const servingRect = this.add.rectangle(layout.servingArea.x, layout.servingArea.y, 80, 80, 0xFFD700);
-        servingRect.setStrokeStyle(2, 0xDAA520);
-        this.add.text(layout.servingArea.x, layout.servingArea.y - 50, '上菜区', {
-            fontSize: '12px',
-            fontFamily: 'Courier New',
-            color: '#8B4513'
-        }).setOrigin(0.5);
-
-        // 洗盘子区
-        const washRect = this.add.rectangle(layout.washArea.x, layout.washArea.y, 80, 60, 0x87CEEB);
-        washRect.setStrokeStyle(2, 0x4682B4);
-        this.add.text(layout.washArea.x, layout.washArea.y - 40, '清洗区', {
-            fontSize: '12px',
-            fontFamily: 'Courier New',
-            color: '#8B4513'
+            color: '#8B4513',
+            fontStyle: 'bold'
         }).setOrigin(0.5);
     }
 
+    // 绘制回字形通道区域
+    drawWalkwayAreas(layout, config) {
+        // 绘制外圈通道（浅色地板）
+        const outerPixel = gameData.gridToPixel(layout.outerWalkway.gridX, layout.outerWalkway.gridY);
+        const outerFloor = this.add.rectangle(
+            outerPixel.x + (layout.outerWalkway.gridWidth * config.gridSize) / 2 - config.gridSize / 2,
+            outerPixel.y + (layout.outerWalkway.gridHeight * config.gridSize) / 2 - config.gridSize / 2,
+            layout.outerWalkway.gridWidth * config.gridSize,
+            layout.outerWalkway.gridHeight * config.gridSize,
+            0xF5DEB3, 0.2
+        );
+        outerFloor.setStrokeStyle(1, 0xDEB887);
+        
+        // 绘制内圈通道（更浅色地板）
+        const innerPixel = gameData.gridToPixel(layout.innerWalkway.gridX, layout.innerWalkway.gridY);
+        const innerFloor = this.add.rectangle(
+            innerPixel.x + (layout.innerWalkway.gridWidth * config.gridSize) / 2 - config.gridSize / 2,
+            innerPixel.y + (layout.innerWalkway.gridHeight * config.gridSize) / 2 - config.gridSize / 2,
+            layout.innerWalkway.gridWidth * config.gridSize,
+            layout.innerWalkway.gridHeight * config.gridSize,
+            0xFFFACD, 0.3
+        );
+        innerFloor.setStrokeStyle(1, 0xF0E68C);
+        
+        // 添加通道标识
+        this.add.text(outerPixel.x + 20, outerPixel.y + 20, '外圈通道', {
+            fontSize: '10px',
+            fontFamily: 'Courier New',
+            color: '#8B7355',
+            alpha: 0.7
+        });
+        
+        this.add.text(innerPixel.x + 20, innerPixel.y + 20, '内圈通道', {
+            fontSize: '10px',
+            fontFamily: 'Courier New',
+            color: '#8B7355',
+            alpha: 0.7
+        });
+    }
+
+    // 绘制网格线
+    drawGridLines() {
+        const config = gameData.config;
+        const graphics = this.add.graphics();
+        graphics.lineStyle(1, 0xCCCCCC, 0.5);
+
+        // 绘制垂直线
+        for (let x = 0; x <= config.gridWidth; x++) {
+            const pixelX = x * config.gridSize;
+            graphics.moveTo(pixelX, 0);
+            graphics.lineTo(pixelX, config.gameHeight);
+        }
+
+        // 绘制水平线
+        for (let y = 0; y <= config.gridHeight; y++) {
+            const pixelY = y * config.gridSize;
+            graphics.moveTo(0, pixelY);
+            graphics.lineTo(config.gameWidth, pixelY);
+        }
+
+        graphics.strokePath();
+    }
+
+    // 绘制网格化工作台
+    drawGridWorkstation(station) {
+        const pixel = gameData.gridToPixel(station.gridX, station.gridY);
+        const config = gameData.config;
+        
+        // 计算工作台的像素尺寸
+        const width = station.gridWidth * config.gridSize;
+        const height = station.gridHeight * config.gridSize;
+        
+        // 根据工作台类型选择颜色
+        let color, strokeColor, textColor;
+        switch (station.type) {
+            case 'ingredient_storage':
+                color = 0x90EE90; // 浅绿色
+                strokeColor = 0x228B22;
+                textColor = '#006400';
+                break;
+            case 'microwave':
+                color = 0xFFB6C1; // 浅粉色
+                strokeColor = 0xFF69B4;
+                textColor = '#8B008B';
+                break;
+            case 'cooking_counter':
+                color = 0xDEB887; // 浅棕色 - 料理台
+                strokeColor = 0xCD853F;
+                textColor = '#8B4513';
+                break;
+            case 'workstation':
+                color = 0x87CEEB; // 天蓝色 (保留兼容性)
+                strokeColor = 0x4682B4;
+                textColor = '#191970';
+                break;
+            case 'serving':
+                color = 0xFFD700; // 金色
+                strokeColor = 0xFFA500;
+                textColor = '#B8860B';
+                break;
+            default:
+                color = 0xDDDDDD;
+                strokeColor = 0x999999;
+                textColor = '#333333';
+        }
+        
+        // 绘制工作台矩形
+        const rect = this.add.rectangle(
+            pixel.x + width / 2 - config.gridSize / 2,
+            pixel.y + height / 2 - config.gridSize / 2,
+            width - 4, // 留一点边距
+            height - 4,
+            color,
+            0.8
+        );
+        rect.setStrokeStyle(2, strokeColor);
+        
+        // 添加工作台标签
+        const fontSize = station.gridWidth > 1 ? '10px' : '8px';
+        this.add.text(
+            pixel.x + width / 2 - config.gridSize / 2,
+            pixel.y + height / 2 - config.gridSize / 2,
+            station.name,
+            {
+                fontSize: fontSize,
+                fontFamily: 'Courier New',
+                color: textColor,
+                fontStyle: 'bold',
+                align: 'center'
+            }
+        ).setOrigin(0.5);
+        
+        // 为食材存储区域显示数量
+        if (station.type === 'ingredient_storage' && station.ingredientId) {
+            const storageInfo = this.kitchen.getStorageInfo(station.ingredientId);
+            if (storageInfo) {
+                this.add.text(
+                    pixel.x + width / 2 - config.gridSize / 2,
+                    pixel.y + height / 2 - config.gridSize / 2 + 12,
+                    `x${storageInfo.quantity}`,
+                    {
+                        fontSize: '8px',
+                        fontFamily: 'Courier New',
+                        color: textColor,
+                        align: 'center'
+                    }
+                ).setOrigin(0.5);
+            }
+        }
+        
+        // 为料理台添加特殊图标
+        if (station.type === 'cooking_counter') {
+            this.addCookingCounterIcon(station, pixel, width, height);
+        }
+    }
+
+    // 为料理台添加图标
+    addCookingCounterIcon(station, pixel, width, height) {
+        const centerX = pixel.x + width / 2 - gameData.config.gridSize / 2;
+        const centerY = pixel.y + height / 2 - gameData.config.gridSize / 2;
+        
+        // 添加简单的料理台图标 - 小圆点表示可放置食材
+        const icon = this.add.circle(centerX + 15, centerY - 8, 3, 0x8B4513, 0.6);
+        icon.setStrokeStyle(1, 0x654321);
+    }
+    
+    drawWorkstation(station) {
+        // 根据工作台类型选择颜色
+        const colors = {
+            meat_storage: { bg: 0xFFB6C1, border: 0xDC143C, text: '#8B0000' },
+            vegetable_storage: { bg: 0x90EE90, border: 0x228B22, text: '#006400' },
+            semi_storage: { bg: 0xF0E68C, border: 0xDAA520, text: '#B8860B' },
+            microwave: { bg: 0x8B4513, border: 0x654321, text: '#FFFFFF' },
+            workstation: { bg: 0xDEB887, border: 0xCD853F, text: '#8B4513' },
+            serving: { bg: 0xFFD700, border: 0xDAA520, text: '#8B4513' },
+
+            prep: { bg: 0xD3D3D3, border: 0x696969, text: '#2F4F4F' }
+        };
+        
+        const color = colors[station.type] || colors.prep;
+        
+        // 绘制工作台背景
+        const stationRect = this.add.rectangle(
+            station.x, station.y, 
+            station.width, station.height, 
+            color.bg
+        );
+        stationRect.setStrokeStyle(3, color.border);
+        
+        // 添加工作台标签
+        this.add.text(station.x, station.y - station.height/2 - 15, station.name, {
+            fontSize: '11px',
+            fontFamily: 'Courier New',
+            color: color.text,
+            fontStyle: 'bold'
+        }).setOrigin(0.5);
+        
+        // 为食材存储区域添加类别图标
+        if (station.type.includes('storage')) {
+            this.addStorageIcon(station);
+        }
+        
+        // 为微波炉添加特殊标识
+        if (station.type === 'microwave') {
+            this.addMicrowaveIcon(station);
+        }
+    }
+    
+    addStorageIcon(station) {
+        const iconSize = 20;
+        let iconColor = 0x666666;
+        let iconText = '?';
+        
+        switch(station.category) {
+            case 'meat':
+                iconColor = 0xDC143C;
+                iconText = '🥩';
+                break;
+            case 'vegetable':
+                iconColor = 0x228B22;
+                iconText = '🥬';
+                break;
+            case 'semi':
+                iconColor = 0xDAA520;
+                iconText = '📦';
+                break;
+        }
+        
+        // 简单的图标背景
+        const iconBg = this.add.circle(station.x, station.y, iconSize/2, iconColor, 0.3);
+        iconBg.setStrokeStyle(2, iconColor);
+        
+        // 图标文字（使用emoji或简单字符）
+        this.add.text(station.x, station.y, iconText, {
+            fontSize: '16px',
+            fontFamily: 'Arial'
+        }).setOrigin(0.5);
+    }
+    
+    addMicrowaveIcon(station) {
+        // 微波炉门
+        const door = this.add.rectangle(station.x - 15, station.y, 25, 35, 0x2F4F4F, 0.8);
+        door.setStrokeStyle(2, 0x000000);
+        
+        // 微波炉窗口
+        const window = this.add.circle(station.x - 15, station.y - 5, 8, 0x87CEEB, 0.6);
+        window.setStrokeStyle(1, 0x4682B4);
+        
+        // 控制面板
+        const panel = this.add.rectangle(station.x + 15, station.y, 15, 30, 0x696969);
+        panel.setStrokeStyle(1, 0x2F4F4F);
+    }
+
     createPlayer() {
-        const startPos = gameData.kitchenLayout.playerStart;
-        this.player = new Player(this, startPos.x, startPos.y);
+        const startGrid = gameData.kitchenLayout.playerStart;
+        const startPixel = gameData.gridToPixel(startGrid.gridX, startGrid.gridY);
+        this.player = new Player(this, startPixel.x, startPixel.y);
     }
 
     setupControls() {
@@ -259,7 +485,13 @@ class GameScene extends Phaser.Scene {
         // 更新订单系统
         if (this.orderSystem) {
             this.orderSystem.update();
+            
+            // 更新游戏状态中的订单信息
+            this.gameState.orders = this.orderSystem.getCurrentOrders();
         }
+        
+        // 实时更新UI（包括进度条）
+        this.updateUI();
     }
 
     // 添加分数

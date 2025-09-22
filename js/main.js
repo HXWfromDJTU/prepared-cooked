@@ -166,31 +166,103 @@ class PreparedCookedGame {
         const ordersList = document.getElementById('orders-list');
         if (!ordersList) return;
 
-        ordersList.innerHTML = '';
+        // 获取当前存在的订单元素
+        const existingOrders = Array.from(ordersList.querySelectorAll('.order-item'));
+        const existingOrderIds = existingOrders.map(el => parseInt(el.getAttribute('data-order-id')));
+        const currentOrderIds = orders.map(order => order.id);
 
-        orders.forEach(order => {
-            const orderElement = document.createElement('div');
-            orderElement.className = 'order-item';
+        // 移除已完成或过期的订单
+        existingOrders.forEach(orderElement => {
+            const orderId = parseInt(orderElement.getAttribute('data-order-id'));
+            if (!currentOrderIds.includes(orderId)) {
+                // 添加消失动画
+                orderElement.style.transition = 'all 0.3s ease-out';
+                orderElement.style.transform = 'translateX(100%)';
+                orderElement.style.opacity = '0';
+                setTimeout(() => {
+                    if (orderElement.parentNode) {
+                        orderElement.parentNode.removeChild(orderElement);
+                    }
+                }, 300);
+            }
+        });
+
+        // 更新或添加订单
+        orders.forEach((order, index) => {
+            let orderElement = ordersList.querySelector(`[data-order-id="${order.id}"]`);
             
             const timeLeft = Math.max(0, Math.ceil((order.deadline - Date.now()) / 1000));
-            const ingredients = order.recipe.ingredients.map(id => gameData.getIngredient(id).name).join(', ');
+            const totalTime = Math.ceil(order.recipe.timeLimit / 1000);
+            const timeProgress = Math.max(0, (timeLeft / totalTime) * 100);
             
-            orderElement.innerHTML = `
-                <div class="dish-name">${order.recipe.name}</div>
-                <div class="ingredients">${ingredients}</div>
-                <div class="timer">${timeLeft}s</div>
-            `;
+            if (!orderElement) {
+                // 创建新订单元素
+                orderElement = document.createElement('div');
+                orderElement.className = 'order-item';
+                orderElement.setAttribute('data-order-id', order.id);
+                
+                const ingredients = order.recipe.ingredients.map(id => gameData.getIngredient(id).name).join(', ');
+                
+                orderElement.innerHTML = `
+                    <div class="dish-name">${order.recipe.name}</div>
+                    <div class="ingredients">${ingredients}</div>
+                    <div class="timer-section">
+                        <span class="customer-name">客户: ${order.customer.name}</span>
+                        <span class="timer">${timeLeft}s</span>
+                    </div>
+                    <div class="progress-container">
+                        <div class="progress-bar" style="width: ${timeProgress}%"></div>
+                    </div>
+                `;
 
-            // 根据剩余时间改变颜色
-            if (timeLeft < 10) {
-                orderElement.style.borderColor = '#DC143C';
-                orderElement.style.backgroundColor = '#FFE4E1';
-            } else if (timeLeft < 20) {
-                orderElement.style.borderColor = '#FF8C00';
-                orderElement.style.backgroundColor = '#FFF8DC';
+                // 添加出现动画
+                orderElement.style.opacity = '0';
+                orderElement.style.transform = 'translateX(-100%)';
+                ordersList.appendChild(orderElement);
+                
+                // 触发动画
+                setTimeout(() => {
+                    orderElement.style.transition = 'all 0.3s ease-out';
+                    orderElement.style.opacity = '1';
+                    orderElement.style.transform = 'translateX(0)';
+                }, 10);
+            } else {
+                // 更新现有订单的时间和进度条
+                const timerElement = orderElement.querySelector('.timer');
+                const progressBar = orderElement.querySelector('.progress-bar');
+                
+                if (timerElement) {
+                    timerElement.textContent = `${timeLeft}s`;
+                }
+                
+                if (progressBar) {
+                    progressBar.style.width = `${timeProgress}%`;
+                }
             }
 
-            ordersList.appendChild(orderElement);
+            // 重置样式类
+            orderElement.className = 'order-item';
+            const progressBar = orderElement.querySelector('.progress-bar');
+            progressBar.className = 'progress-bar';
+
+            // 根据剩余时间设置紧急程度样式
+            if (timeLeft < 10) {
+                // 非常紧急 - 红色闪烁
+                orderElement.classList.add('critical');
+                progressBar.classList.add('critical');
+            } else if (timeLeft < 20) {
+                // 紧急 - 橙色脉冲
+                orderElement.classList.add('urgent');
+                progressBar.classList.add('urgent');
+            }
+
+            // 添加客户耐心度指示
+            const patienceLevel = order.customer.patience || 1;
+            if (patienceLevel < 0.5) {
+                orderElement.style.boxShadow = '0 0 15px rgba(220, 20, 60, 0.6)';
+            } else {
+                orderElement.style.boxShadow = '';
+            }
         });
     }
 }

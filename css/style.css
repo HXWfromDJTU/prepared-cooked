@@ -104,6 +104,8 @@ body {
     padding: 8px;
     margin-bottom: 8px;
     font-size: 12px;
+    position: relative;
+    overflow: hidden;
 }
 
 .order-item .dish-name {
@@ -115,12 +117,82 @@ body {
 .order-item .ingredients {
     color: var(--text-color);
     font-size: 10px;
+    margin-bottom: 6px;
+}
+
+.order-item .timer-section {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 4px;
 }
 
 .order-item .timer {
-    float: right;
     color: #DC143C;
     font-weight: bold;
+    font-size: 11px;
+}
+
+/* 进度条容器 */
+.progress-container {
+    width: 100%;
+    height: 6px;
+    background-color: #f0f0f0;
+    border-radius: 3px;
+    overflow: hidden;
+    border: 1px solid var(--border-color);
+    position: relative;
+}
+
+/* 进度条 */
+.progress-bar {
+    height: 100%;
+    background: linear-gradient(90deg, #90EE90 0%, #FFD700 50%, #FF6347 100%);
+    border-radius: 3px;
+    transition: width 0.5s ease-out;
+    position: relative;
+}
+
+/* 进度条动画效果 */
+.progress-bar.urgent {
+    animation: pulse 1s infinite;
+}
+
+.progress-bar.critical {
+    animation: flash 0.5s infinite;
+    background: linear-gradient(90deg, #FF4500 0%, #DC143C 100%);
+}
+
+@keyframes pulse {
+    0% { opacity: 1; }
+    50% { opacity: 0.7; }
+    100% { opacity: 1; }
+}
+
+@keyframes flash {
+    0% { opacity: 1; }
+    50% { opacity: 0.3; }
+    100% { opacity: 1; }
+}
+
+/* 订单项根据紧急程度的边框颜色 */
+.order-item.urgent {
+    border-color: #FF8C00;
+    background-color: #FFF8DC;
+    box-shadow: 0 0 8px rgba(255, 140, 0, 0.3);
+}
+
+.order-item.critical {
+    border-color: #DC143C;
+    background-color: #FFE4E1;
+    box-shadow: 0 0 12px rgba(220, 20, 60, 0.4);
+    animation: shake 0.5s infinite;
+}
+
+@keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-2px); }
+    75% { transform: translateX(2px); }
 }
 
 /* 游戏说明面板 */

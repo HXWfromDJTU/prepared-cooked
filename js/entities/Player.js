@@ -4,9 +4,13 @@ class Player {
         this.scene = scene;
         this.x = x;
         this.y = y;
+        this.gridX = Math.floor(x / gameData.config.gridSize);
+        this.gridY = Math.floor(y / gameData.config.gridSize);
         this.speed = 150;
         this.carryingItem = null; // 当前携带的物品
         this.interactionRange = 50; // 交互范围
+        this.isMoving = false; // 是否正在移动
+        this.moveKeys = {}; // 按键状态跟踪
         
         this.create();
     }
@@ -41,31 +45,106 @@ class Player {
     }
 
     handleMovement() {
+        if (this.isMoving) return; // 如果正在移动，不处理新的移动输入
+
         const cursors = this.scene.cursors;
         const wasd = this.scene.wasd;
         
-        let velocityX = 0;
-        let velocityY = 0;
+        let targetGridX = this.gridX;
+        let targetGridY = this.gridY;
+        let shouldMove = false;
 
-        // 检查移动输入
-        if (cursors.left.isDown || wasd.A.isDown) {
-            velocityX = -this.speed;
-        } else if (cursors.right.isDown || wasd.D.isDown) {
-            velocityX = this.speed;
+        // 检查按键状态变化（只在按键刚按下时移动）
+        if ((cursors.left.isDown || wasd.A.isDown) && !this.moveKeys.left) {
+            targetGridX = Math.max(0, this.gridX - 1);
+            shouldMove = true;
+            this.moveKeys.left = true;
+        } else if ((cursors.right.isDown || wasd.D.isDown) && !this.moveKeys.right) {
+            targetGridX = Math.min(gameData.config.gridWidth - 1, this.gridX + 1);
+            shouldMove = true;
+            this.moveKeys.right = true;
+        } else if ((cursors.up.isDown || wasd.W.isDown) && !this.moveKeys.up) {
+            targetGridY = Math.max(0, this.gridY - 1);
+            shouldMove = true;
+            this.moveKeys.up = true;
+        } else if ((cursors.down.isDown || wasd.S.isDown) && !this.moveKeys.down) {
+            targetGridY = Math.min(gameData.config.gridHeight - 1, this.gridY + 1);
+            shouldMove = true;
+            this.moveKeys.down = true;
         }
 
-        if (cursors.up.isDown || wasd.W.isDown) {
-            velocityY = -this.speed;
-        } else if (cursors.down.isDown || wasd.S.isDown) {
-            velocityY = this.speed;
+        // 重置按键状态
+        if (!cursors.left.isDown && !wasd.A.isDown) this.moveKeys.left = false;
+        if (!cursors.right.isDown && !wasd.D.isDown) this.moveKeys.right = false;
+        if (!cursors.up.isDown && !wasd.W.isDown) this.moveKeys.up = false;
+        if (!cursors.down.isDown && !wasd.S.isDown) this.moveKeys.down = false;
+
+        if (shouldMove && (targetGridX !== this.gridX || targetGridY !== this.gridY)) {
+            this.moveToGrid(targetGridX, targetGridY);
+        }
+    }
+
+    // 移动到指定网格位置
+    moveToGrid(targetGridX, targetGridY) {
+        if (this.isMoving) return;
+
+        // 检查目标位置是否在允许的通道内
+        if (!this.isValidWalkwayPosition(targetGridX, targetGridY)) {
+            console.log('无法移动到该位置，不在通道内');
+            return;
         }
 
-        // 设置速度
-        this.sprite.body.setVelocity(velocityX, velocityY);
+        this.isMoving = true;
+        this.gridX = targetGridX;
+        this.gridY = targetGridY;
+
+        const targetPixel = gameData.gridToPixel(targetGridX, targetGridY);
         
-        // 更新位置
-        this.x = this.sprite.x;
-        this.y = this.sprite.y;
+        // 使用Phaser的补间动画进行平滑移动
+        this.scene.tweens.add({
+            targets: this.sprite,
+            x: targetPixel.x,
+            y: targetPixel.y,
+            duration: 200, // 200ms移动时间
+            ease: 'Power2',
+            onComplete: () => {
+                this.isMoving = false;
+                this.x = this.sprite.x;
+                this.y = this.sprite.y;
+            }
+        });
+    }
+
+    // 检查位置是否在允许的通道内
+    isValidWalkwayPosition(gridX, gridY) {
+        const layout = gameData.kitchenLayout;
+        
+        // 检查是否在外圈通道内
+        const inOuterWalkway = (
+            gridX >= layout.outerWalkway.gridX && 
+            gridX < layout.outerWalkway.gridX + layout.outerWalkway.gridWidth &&
+            gridY >= layout.outerWalkway.gridY && 
+            gridY < layout.outerWalkway.gridY + layout.outerWalkway.gridHeight
+        );
+        
+        // 检查是否在内圈通道内
+        const inInnerWalkway = (
+            gridX >= layout.innerWalkway.gridX && 
+            gridX < layout.innerWalkway.gridX + layout.innerWalkway.gridWidth &&
+            gridY >= layout.innerWalkway.gridY && 
+            gridY < layout.innerWalkway.gridY + layout.innerWalkway.gridHeight
+        );
+        
+        // 检查是否与工作台重叠
+        const onWorkstation = layout.workstations.some(station => 
+            gridX >= station.gridX && 
+            gridX < station.gridX + station.gridWidth &&
+            gridY >= station.gridY && 
+            gridY < station.gridY + station.gridHeight
+        );
+        
+        // 只有在通道内且不与工作台重叠的位置才能移动
+        return (inOuterWalkway || inInnerWalkway) && !onWorkstation;
     }
 
     updateUI() {
@@ -95,19 +174,26 @@ class Player {
     findNearbyInteractable() {
         const layout = gameData.kitchenLayout;
         
-        // 检查各个功能区域
-        const areas = [
-            { ...layout.storage, type: 'storage', name: '食材储存' },
-            { ...layout.workstation, type: 'workstation', name: '组装台' },
-            { ...layout.servingArea, type: 'serving', name: '上菜区' },
-            { ...layout.washArea, type: 'wash', name: '清洗区' },
-            ...layout.microwaves.map((m, i) => ({ ...m, type: 'microwave', name: `微波炉${i + 1}` }))
-        ];
-
-        for (let area of areas) {
-            const distance = Phaser.Math.Distance.Between(this.x, this.y, area.x, area.y);
-            if (distance <= this.interactionRange) {
-                return area;
+        // 检查玩家当前网格位置是否与工作台重叠或相邻
+        for (let station of layout.workstations) {
+            const stationPixel = gameData.gridToPixel(station.gridX, station.gridY);
+            
+            // 检查玩家是否在工作台的交互范围内（相邻网格）
+            const gridDistance = Math.abs(this.gridX - station.gridX) + Math.abs(this.gridY - station.gridY);
+            
+            if (gridDistance <= 2) { // 允许在相邻2格内交互
+                return {
+                    x: stationPixel.x,
+                    y: stationPixel.y,
+                    gridX: station.gridX,
+                    gridY: station.gridY,
+                    gridWidth: station.gridWidth,
+                    gridHeight: station.gridHeight,
+                    type: station.type,
+                    name: station.name,
+                    ingredientId: station.ingredientId,
+                    id: station.id
+                };
             }
         }
 
@@ -118,8 +204,8 @@ class Player {
         console.log(`与 ${object.name} 交互`);
 
         switch (object.type) {
-            case 'storage':
-                this.interactWithStorage();
+            case 'ingredient_storage':
+                this.interactWithIngredientStorage(object);
                 break;
             case 'microwave':
                 this.interactWithMicrowave(object);
@@ -127,104 +213,348 @@ class Player {
             case 'workstation':
                 this.interactWithWorkstation();
                 break;
+            case 'cooking_counter':
+                this.interactWithCookingCounter(object);
+                break;
             case 'serving':
                 this.interactWithServingArea();
                 break;
-            case 'wash':
-                this.interactWithWashArea();
-                break;
+            default:
+                console.log(`未知的交互对象类型: ${object.type}`);
         }
     }
 
-    interactWithStorage() {
+    // 与具体食材存储区域交互
+    interactWithIngredientStorage(storageArea) {
         if (this.carryingItem) {
             console.log('手上已有物品，无法取新的食材');
             return;
         }
 
-        // 随机选择一个食材
-        const ingredientIds = Object.keys(gameData.ingredients);
-        const randomId = ingredientIds[Math.floor(Math.random() * ingredientIds.length)];
-        const ingredient = gameData.getIngredient(randomId);
-
-        this.carryingItem = {
-            id: randomId,
-            name: ingredient.name,
-            type: 'raw_ingredient',
-            defrostTime: ingredient.defrostTime,
-            category: ingredient.category
-        };
-
-        console.log(`取得食材: ${ingredient.name}`);
-        this.showInteractionFeedback(`取得: ${ingredient.name}`, 0x90EE90);
+        // 从指定食材存储区域取食材
+        const item = this.scene.kitchen.takeFromStorage(storageArea.ingredientId);
+        
+        if (item) {
+            this.carryingItem = item;
+            console.log(`从${storageArea.name}存储区取得食材: ${item.name}`);
+            this.showInteractionFeedback(`取得: ${item.name}`, 0x90EE90);
+        } else {
+            console.log(`${storageArea.name}存储区已空`);
+            this.showInteractionFeedback(`${storageArea.name}已空`, 0xFF6347);
+        }
     }
+    
+
 
     interactWithMicrowave(microwave) {
+        const microwaveStatus = this.scene.kitchen.getMicrowaveStatus(microwave.id);
+        
+        if (!microwaveStatus) {
+            console.log('微波炉状态异常');
+            return;
+        }
+        
+        // 如果微波炉已完成解冻，优先取出食材
+        if (microwaveStatus.isReady && microwaveStatus.currentItem) {
+            if (this.carryingItem) {
+                console.log('手上已有物品，无法取出解冻好的食材');
+                this.showInteractionFeedback('手上已满', 0xFF6347);
+                return;
+            }
+            
+            // 取出解冻好的食材
+            const defrostedItem = this.scene.kitchen.takeFromMicrowave(microwave.id);
+            if (defrostedItem) {
+                this.carryingItem = defrostedItem;
+                console.log(`取出解冻好的食材: ${defrostedItem.name}`);
+                this.showInteractionFeedback(`取出: ${defrostedItem.name}`, 0xFFD700);
+            }
+            return;
+        }
+        
+        // 如果微波炉正在工作，显示状态
+        if (microwaveStatus.isOccupied && !microwaveStatus.isReady) {
+            console.log(`微波炉正在解冻: ${microwaveStatus.currentItem.name}`);
+            this.showInteractionFeedback('正在解冻中...', 0xFFA500);
+            return;
+        }
+        
+        // 如果微波炉空闲，可以放入食材
         if (!this.carryingItem) {
             console.log('手上没有食材可以解冻');
+            this.showInteractionFeedback('需要食材', 0xFF6347);
             return;
         }
 
         if (this.carryingItem.type !== 'raw_ingredient') {
             console.log('只能解冻生食材');
+            this.showInteractionFeedback('只能解冻生食材', 0xFF6347);
             return;
         }
 
         // 开始解冻过程
-        console.log(`开始解冻: ${this.carryingItem.name}`);
-        this.startDefrosting(microwave);
+        if (this.scene.kitchen.useMicrowave(microwave.id, this.carryingItem)) {
+            console.log(`开始解冻: ${this.carryingItem.name}`);
+            this.showInteractionFeedback(`开始解冻: ${this.carryingItem.name}`, 0x90EE90);
+            this.carryingItem = null; // 清空手上的物品
+        } else {
+            console.log('微波炉使用失败');
+            this.showInteractionFeedback('微波炉忙碌', 0xFF6347);
+        }
     }
 
-    startDefrosting(microwave) {
-        const item = this.carryingItem;
-        this.carryingItem = null; // 放入微波炉，手上清空
 
-        // 创建解冻计时器
-        const defrostTimer = this.scene.time.addEvent({
-            delay: item.defrostTime,
-            callback: () => {
-                // 解冻完成
-                console.log(`${item.name} 解冻完成`);
-                this.showInteractionFeedback(`${item.name} 解冻完成!`, 0xFFD700);
-                
-                // 可以在这里添加解冻完成的视觉效果
-                // 暂时直接让玩家可以取回
-                if (!this.carryingItem) {
-                    this.carryingItem = {
-                        ...item,
-                        type: 'defrosted_ingredient'
-                    };
-                }
-            },
-            callbackScope: this
-        });
-
-        this.showInteractionFeedback(`解冻中: ${item.name}`, 0xFFA500);
-    }
 
     interactWithWorkstation() {
-        if (!this.carryingItem || this.carryingItem.type !== 'defrosted_ingredient') {
-            console.log('需要解冻后的食材才能组装');
+        if (!this.carryingItem) {
+            // 如果没有携带物品，检查是否可以取走已完成的菜品
+            if (this.scene.kitchen && this.scene.kitchen.workstationItems && this.scene.kitchen.workstationItems.length > 0) {
+                const finishedDish = this.scene.kitchen.workstationItems.find(item => item.type === 'finished_dish');
+                if (finishedDish) {
+                    this.carryingItem = finishedDish;
+                    this.scene.kitchen.workstationItems = this.scene.kitchen.workstationItems.filter(item => item !== finishedDish);
+                    this.showInteractionFeedback(`取走: ${finishedDish.name}`, 0xFFD700);
+                    return;
+                }
+            }
+            console.log('组装台上没有可取的物品');
             return;
         }
 
-        // 这里应该实现菜品组装逻辑
-        // 暂时简化为直接完成一个菜品
-        console.log(`在工作台组装: ${this.carryingItem.name}`);
+        // 组装台现在可以直接处理解冻后的食材
+        if (this.carryingItem.type !== 'defrosted_ingredient' && this.carryingItem.type !== 'prepared_ingredient') {
+            console.log('需要解冻后的食材才能组装');
+            this.showInteractionFeedback('需要解冻后的食材', 0xFF6B6B);
+            return;
+        }
+
+        // 如果是解冻后的食材，直接转换为准备好的食材
+        if (this.carryingItem.type === 'defrosted_ingredient') {
+            this.carryingItem = {
+                ...this.carryingItem,
+                type: 'prepared_ingredient',
+                name: `已处理的${this.carryingItem.originalName || this.carryingItem.name}`,
+                originalId: this.carryingItem.originalId || this.carryingItem.id,
+                originalName: this.carryingItem.originalName || this.carryingItem.name
+            };
+        }
+
+        // 将食材添加到组装台
+        if (!this.scene.kitchen.workstationItems) {
+            this.scene.kitchen.workstationItems = [];
+        }
+
+        this.scene.kitchen.workstationItems.push(this.carryingItem);
+        console.log(`添加食材到组装台: ${this.carryingItem.name}`);
+        this.showInteractionFeedback(`添加食材: ${this.carryingItem.originalName || this.carryingItem.name}`, 0x87CEEB);
         
-        // 模拟组装成菜品
-        this.carryingItem = {
-            name: `${this.carryingItem.name}料理`,
+        this.carryingItem = null;
+
+        // 检查是否可以完成某个菜品
+        this.checkRecipeCompletion();
+    }
+
+    checkRecipeCompletion() {
+        if (!this.scene.kitchen.workstationItems || this.scene.kitchen.workstationItems.length === 0) {
+            return;
+        }
+
+        // 获取当前组装台上的食材ID列表
+        const currentIngredients = this.scene.kitchen.workstationItems
+            .filter(item => item.type === 'prepared_ingredient')
+            .map(item => item.originalId)
+            .sort();
+
+        // 检查所有菜品配方
+        const recipes = window.gameData.recipes;
+        for (const [recipeId, recipe] of Object.entries(recipes)) {
+            const requiredIngredients = [...recipe.ingredients].sort();
+            
+            // 检查食材是否完全匹配
+            if (this.arraysEqual(currentIngredients, requiredIngredients)) {
+                // 找到匹配的配方，制作菜品
+                this.createDish(recipeId, recipe);
+                return;
+            }
+        }
+
+        // 显示当前食材状态
+        const ingredientNames = this.scene.kitchen.workstationItems
+            .filter(item => item.type === 'prepared_ingredient')
+            .map(item => item.originalName || item.name);
+        
+        if (ingredientNames.length > 0) {
+            this.showInteractionFeedback(`当前食材: ${ingredientNames.join(', ')}`, 0x87CEEB);
+        }
+    }
+
+    arraysEqual(a, b) {
+        if (a.length !== b.length) return false;
+        for (let i = 0; i < a.length; i++) {
+            if (a[i] !== b[i]) return false;
+        }
+        return true;
+    }
+
+    createDish(recipeId, recipe) {
+        // 清除组装台上的食材
+        this.scene.kitchen.workstationItems = this.scene.kitchen.workstationItems.filter(item => item.type !== 'prepared_ingredient');
+        
+        // 创建完成的菜品
+        const finishedDish = {
+            name: recipe.name,
             type: 'finished_dish',
-            baseScore: 100
+            recipeId: recipeId,
+            baseScore: recipe.baseScore,
+            difficulty: recipe.difficulty
         };
 
-        this.showInteractionFeedback('菜品组装完成!', 0x90EE90);
+        // 将菜品放到组装台上
+        this.scene.kitchen.workstationItems.push(finishedDish);
+        
+        this.showInteractionFeedback(`制作完成: ${recipe.name}!`, 0xFFD700);
+        console.log(`成功制作菜品: ${recipe.name}`);
+    }
+
+    // 与料理台交互
+    interactWithCookingCounter(counter) {
+        // 初始化料理台存储
+        if (!this.scene.kitchen.cookingCounters) {
+            this.scene.kitchen.cookingCounters = {};
+        }
+        
+        if (!this.scene.kitchen.cookingCounters[counter.id]) {
+            this.scene.kitchen.cookingCounters[counter.id] = {
+                items: [],
+                maxItems: 4 // 每个料理台最多放4个物品
+            };
+        }
+        
+        const counterData = this.scene.kitchen.cookingCounters[counter.id];
+        
+        if (!this.carryingItem) {
+            // 如果没有携带物品，尝试从料理台取物品
+            if (counterData.items.length > 0) {
+                // 优先取完成的菜品
+                const finishedDish = counterData.items.find(item => item.type === 'finished_dish');
+                if (finishedDish) {
+                    this.carryingItem = finishedDish;
+                    counterData.items = counterData.items.filter(item => item !== finishedDish);
+                    this.showInteractionFeedback(`取走: ${finishedDish.name}`, 0xFFD700);
+                    return;
+                }
+                
+                // 否则取最后放置的物品
+                this.carryingItem = counterData.items.pop();
+                this.showInteractionFeedback(`取走: ${this.carryingItem.name}`, 0xDEB887);
+            } else {
+                this.showInteractionFeedback('料理台是空的', 0x999999);
+            }
+            return;
+        }
+
+        // 如果携带物品，尝试放置到料理台
+        if (counterData.items.length >= counterData.maxItems) {
+            this.showInteractionFeedback('料理台已满', 0xFF6347);
+            return;
+        }
+
+        // 料理台可以放置任何物品
+        let placedItem = null;
+        let feedbackMessage = '';
+        let feedbackColor = 0x87CEEB;
+        
+        if (this.carryingItem.type === 'defrosted_ingredient') {
+            // 解冻后的食材放置时转换为已处理状态
+            placedItem = {
+                ...this.carryingItem,
+                type: 'prepared_ingredient',
+                name: `已处理的${this.carryingItem.originalName || this.carryingItem.name}`,
+                originalId: this.carryingItem.originalId || this.carryingItem.id,
+                originalName: this.carryingItem.originalName || this.carryingItem.name
+            };
+            feedbackMessage = `处理食材: ${placedItem.originalName}`;
+            feedbackColor = 0x90EE90;
+            
+        } else if (this.carryingItem.type === 'prepared_ingredient') {
+            // 已处理的食材直接放置
+            placedItem = this.carryingItem;
+            feedbackMessage = `放置: ${placedItem.originalName || placedItem.name}`;
+            feedbackColor = 0x87CEEB;
+            
+        } else {
+            // 其他任何物品都可以放置（原始食材、碟子等）
+            placedItem = this.carryingItem;
+            feedbackMessage = `放置: ${placedItem.name}`;
+            feedbackColor = 0xDEB887;
+        }
+        
+        // 放置物品到料理台
+        counterData.items.push(placedItem);
+        this.showInteractionFeedback(feedbackMessage, feedbackColor);
+        this.carryingItem = null;
+        
+        // 检查是否可以组装菜品（只有已处理的食材才能参与组装）
+        this.checkCounterRecipeCompletion(counter.id, counterData);
+    }
+
+    // 检查料理台上是否可以完成菜品
+    checkCounterRecipeCompletion(counterId, counterData) {
+        const currentIngredients = counterData.items
+            .filter(item => item.type === 'prepared_ingredient')
+            .map(item => item.originalId)
+            .sort();
+
+        if (currentIngredients.length === 0) return;
+
+        // 检查所有菜品配方
+        const recipes = window.gameData.recipes;
+        for (const [recipeId, recipe] of Object.entries(recipes)) {
+            const requiredIngredients = [...recipe.ingredients].sort();
+            
+            // 检查食材是否完全匹配
+            if (this.arraysEqual(currentIngredients, requiredIngredients)) {
+                // 找到匹配的配方，制作菜品
+                this.createDishOnCounter(counterId, counterData, recipeId, recipe);
+                return;
+            }
+        }
+
+        // 显示当前食材状态
+        const ingredientNames = counterData.items
+            .filter(item => item.type === 'prepared_ingredient')
+            .map(item => item.originalName || item.name);
+        
+        if (ingredientNames.length > 0) {
+            this.showInteractionFeedback(`当前食材: ${ingredientNames.join(', ')}`, 0x87CEEB);
+        }
+    }
+
+    // 在料理台上制作菜品
+    createDishOnCounter(counterId, counterData, recipeId, recipe) {
+        // 清除料理台上的食材
+        counterData.items = counterData.items.filter(item => item.type !== 'prepared_ingredient');
+        
+        // 创建完成的菜品
+        const finishedDish = {
+            name: recipe.name,
+            type: 'finished_dish',
+            recipeId: recipeId,
+            baseScore: recipe.baseScore,
+            difficulty: recipe.difficulty
+        };
+
+        // 将菜品放到料理台上
+        counterData.items.push(finishedDish);
+        
+        this.showInteractionFeedback(`制作完成: ${recipe.name}!`, 0xFFD700);
+        console.log(`在料理台 ${counterId} 成功制作菜品: ${recipe.name}`);
     }
 
     interactWithServingArea() {
         if (!this.carryingItem || this.carryingItem.type !== 'finished_dish') {
             console.log('需要完成的菜品才能上菜');
+            this.showInteractionFeedback('需要完成的菜品', 0xFF6347);
             return;
         }
 
@@ -240,15 +570,7 @@ class Player {
         this.showInteractionFeedback('上菜成功!', 0xFFD700);
     }
 
-    interactWithWashArea() {
-        if (this.carryingItem) {
-            console.log('清洗物品');
-            this.carryingItem = null;
-            this.showInteractionFeedback('物品已清洗', 0x87CEEB);
-        } else {
-            console.log('没有物品需要清洗');
-        }
-    }
+
 
     showInteractionFeedback(message, color = 0xFFFFFF) {
         // 显示交互反馈
