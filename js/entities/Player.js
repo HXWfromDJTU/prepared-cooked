@@ -154,7 +154,9 @@ class Player {
         
         // 更新携带物品显示
         if (this.carryingItem) {
-            this.carryingText.setText(`携带: ${this.carryingItem.name}`);
+            const ingredient = gameData.getIngredient(this.carryingItem.originalId || this.carryingItem.id);
+            const emoji = ingredient ? ingredient.emoji : '🍽️';
+            this.carryingText.setText(`${emoji} ${this.carryingItem.name}`);
         } else {
             this.carryingText.setText('');
         }
@@ -193,6 +195,25 @@ class Player {
                     name: station.name,
                     ingredientId: station.ingredientId,
                     id: station.id
+                };
+            }
+        }
+
+        // 检查单独的工作台（组装台）
+        const workstation = layout.workstation;
+        if (workstation) {
+            const workstationGridPos = gameData.pixelToGrid(workstation.x, workstation.y);
+            const gridDistance = Math.abs(this.gridX - workstationGridPos.gridX) + Math.abs(this.gridY - workstationGridPos.gridY);
+            
+            if (gridDistance <= 2) {
+                return {
+                    x: workstation.x,
+                    y: workstation.y,
+                    gridX: workstationGridPos.gridX,
+                    gridY: workstationGridPos.gridY,
+                    type: 'workstation',
+                    name: '组装台',
+                    id: workstation.id
                 };
             }
         }
@@ -312,7 +333,7 @@ class Player {
                 const finishedDish = this.scene.kitchen.workstationItems.find(item => item.type === 'finished_dish');
                 if (finishedDish) {
                     this.carryingItem = finishedDish;
-                    this.scene.kitchen.workstationItems = this.scene.kitchen.workstationItems.filter(item => item !== finishedDish);
+                    this.scene.kitchen.removeItemFromWorkstation(finishedDish);
                     this.showInteractionFeedback(`取走: ${finishedDish.name}`, 0xFFD700);
                     return;
                 }
@@ -340,12 +361,7 @@ class Player {
         }
 
         // 将食材添加到组装台
-        if (!this.scene.kitchen.workstationItems) {
-            this.scene.kitchen.workstationItems = [];
-        }
-
-        this.scene.kitchen.workstationItems.push(this.carryingItem);
-        console.log(`添加食材到组装台: ${this.carryingItem.name}`);
+        this.scene.kitchen.addItemToWorkstation(this.carryingItem);
         this.showInteractionFeedback(`添加食材: ${this.carryingItem.originalName || this.carryingItem.name}`, 0x87CEEB);
         
         this.carryingItem = null;
@@ -399,6 +415,7 @@ class Player {
     createDish(recipeId, recipe) {
         // 清除组装台上的食材
         this.scene.kitchen.workstationItems = this.scene.kitchen.workstationItems.filter(item => item.type !== 'prepared_ingredient');
+        this.scene.kitchen.updateWorkstationDisplay();
         
         // 创建完成的菜品
         const finishedDish = {
@@ -410,7 +427,7 @@ class Player {
         };
 
         // 将菜品放到组装台上
-        this.scene.kitchen.workstationItems.push(finishedDish);
+        this.scene.kitchen.addItemToWorkstation(finishedDish);
         
         this.showInteractionFeedback(`制作完成: ${recipe.name}!`, 0xFFD700);
         console.log(`成功制作菜品: ${recipe.name}`);

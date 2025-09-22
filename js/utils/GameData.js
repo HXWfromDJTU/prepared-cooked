@@ -35,24 +35,24 @@ class GameData {
         // 食材数据（基于西贝菜品设计）
         this.ingredients = {
             // 肉类 - 解冻时间长
-            'lamb_chop': { name: '羊排', defrostTime: 10000, category: 'meat' },
-            'beef_ribs': { name: '牛肋排', defrostTime: 12000, category: 'meat' },
-            'pork_belly': { name: '五花肉', defrostTime: 8000, category: 'meat' },
-            'chicken_breast': { name: '鸡胸肉', defrostTime: 6000, category: 'meat' },
+            'lamb_chop': { name: '羊排', emoji: '🐑', defrostTime: 10000, category: 'meat' },
+            'beef_ribs': { name: '牛肋排', emoji: '🥩', defrostTime: 12000, category: 'meat' },
+            'pork_belly': { name: '五花肉', emoji: '🥓', defrostTime: 8000, category: 'meat' },
+            'chicken_breast': { name: '鸡胸肉', emoji: '🐔', defrostTime: 6000, category: 'meat' },
             
             // 蔬菜类 - 解冻时间短
-            'cabbage': { name: '白菜', defrostTime: 2000, category: 'vegetable' },
-            'potato': { name: '土豆', defrostTime: 3000, category: 'vegetable' },
-            'mushroom': { name: '蘑菇', defrostTime: 2500, category: 'vegetable' },
-            'onion': { name: '洋葱', defrostTime: 2000, category: 'vegetable' },
-            'carrot': { name: '胡萝卜', defrostTime: 3000, category: 'vegetable' },
+            'cabbage': { name: '白菜', emoji: '🥬', defrostTime: 2000, category: 'vegetable' },
+            'potato': { name: '土豆', emoji: '🥔', defrostTime: 3000, category: 'vegetable' },
+            'mushroom': { name: '蘑菇', emoji: '🍄', defrostTime: 2500, category: 'vegetable' },
+            'onion': { name: '洋葱', emoji: '🧅', defrostTime: 2000, category: 'vegetable' },
+            'carrot': { name: '胡萝卜', emoji: '🥕', defrostTime: 3000, category: 'vegetable' },
             
             // 半成品 - 中等解冻时间
-            'noodles': { name: '面条', defrostTime: 4000, category: 'semi' },
-            'dumpling_skin': { name: '饺子皮', defrostTime: 3000, category: 'semi' },
-            'rice': { name: '米饭', defrostTime: 5000, category: 'semi' },
-            'sauce': { name: '调料包', defrostTime: 1000, category: 'semi' },
-            'cheese': { name: '奶酪', defrostTime: 2000, category: 'semi' }
+            'noodles': { name: '面条', emoji: '🍝', defrostTime: 4000, category: 'semi' },
+            'dumpling_skin': { name: '饺子皮', emoji: '🥟', defrostTime: 3000, category: 'semi' },
+            'rice': { name: '米饭', emoji: '🍚', defrostTime: 5000, category: 'semi' },
+            'sauce': { name: '调料包', emoji: '🧂', defrostTime: 1000, category: 'semi' },
+            'cheese': { name: '奶酪', emoji: '🧀', defrostTime: 2000, category: 'semi' }
         };
 
         // 菜品配方（基于西贝菜品）

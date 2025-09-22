@@ -40,6 +40,9 @@ class Kitchen {
         
         // 初始化组装台物品数组
         this.workstationItems = [];
+        
+        // 工作台UI显示相关
+        this.workstationItemsUI = [];
     }
 
     generateStorageItems() {
@@ -148,8 +151,10 @@ class Kitchen {
             fontStyle: 'bold'
         }).setOrigin(0.5);
         
-        // 食材名称文本
-        microwave.itemText = this.scene.add.text(x, y + 15, microwave.currentItem.name, {
+        // 食材名称文本（包含emoji）
+        const ingredient = gameData.getIngredient(microwave.currentItem.originalId || microwave.currentItem.id);
+        const emoji = ingredient ? ingredient.emoji : '🍽️';
+        microwave.itemText = this.scene.add.text(x, y + 15, `${emoji} ${microwave.currentItem.name}`, {
             fontSize: '10px',
             fontFamily: 'Courier New',
             color: '#8B4513'
@@ -401,6 +406,14 @@ class Kitchen {
             this.clearMicrowaveUI(microwave);
         });
 
+        // 清理工作台UI元素
+        if (this.workstationItemsUI) {
+            this.workstationItemsUI.forEach(ui => {
+                ui.destroy();
+            });
+            this.workstationItemsUI = [];
+        }
+
         // 重置状态
         this.init();
     }
@@ -409,5 +422,77 @@ class Kitchen {
     update() {
         // 这里可以添加需要每帧更新的逻辑
         // 比如检查微波炉状态、更新UI等
+    }
+
+    // 更新工作台食材显示
+    updateWorkstationDisplay() {
+        // 清除现有的UI元素
+        this.workstationItemsUI.forEach(ui => {
+            ui.destroy();
+        });
+        this.workstationItemsUI = [];
+
+        // 获取工作台位置
+        const layout = gameData.kitchenLayout;
+        const workstation = layout.workstation;
+        const centerX = workstation.x;
+        const centerY = workstation.y;
+
+        // 显示当前工作台上的食材
+        if (this.workstationItems && this.workstationItems.length > 0) {
+            this.workstationItems.forEach((item, index) => {
+                // 计算食材显示位置（在工作台周围排列）
+                const angle = (index / this.workstationItems.length) * Math.PI * 2;
+                const radius = 30;
+                const x = centerX + Math.cos(angle) * radius;
+                const y = centerY + Math.sin(angle) * radius;
+
+                // 获取食材的emoji
+                const ingredient = gameData.getIngredient(item.originalId || item.id);
+                const emoji = ingredient ? ingredient.emoji : '🍽️';
+
+                // 创建食材emoji显示
+                const emojiText = this.scene.add.text(x, y, emoji, {
+                    fontSize: '20px'
+                }).setOrigin(0.5);
+
+                // 创建食材名称显示
+                const nameText = this.scene.add.text(x, y + 25, item.originalName || item.name, {
+                    fontSize: '8px',
+                    fontFamily: 'Courier New',
+                    color: '#8B4513',
+                    backgroundColor: 'rgba(255, 255, 255, 0.8)',
+                    padding: { x: 4, y: 2 }
+                }).setOrigin(0.5);
+
+                this.workstationItemsUI.push(emojiText, nameText);
+            });
+        }
+    }
+
+    // 添加食材到工作台
+    addItemToWorkstation(item) {
+        if (!this.workstationItems) {
+            this.workstationItems = [];
+        }
+        
+        this.workstationItems.push(item);
+        this.updateWorkstationDisplay();
+        
+        console.log(`添加食材到工作台: ${item.originalName || item.name}`);
+    }
+
+    // 从工作台移除食材
+    removeItemFromWorkstation(item) {
+        if (this.workstationItems) {
+            this.workstationItems = this.workstationItems.filter(i => i !== item);
+            this.updateWorkstationDisplay();
+        }
+    }
+
+    // 清空工作台
+    clearWorkstation() {
+        this.workstationItems = [];
+        this.updateWorkstationDisplay();
     }
 }

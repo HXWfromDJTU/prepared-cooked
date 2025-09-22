@@ -84,6 +84,11 @@ class GameScene extends Phaser.Scene {
             this.drawGridWorkstation(station);
         });
         
+        // 绘制单独的组装台
+        if (layout.workstation) {
+            this.drawSingleWorkstation(layout.workstation);
+        }
+        
         // 添加厨房标题
         this.add.text(config.gameWidth / 2, 30, '西贝莜面村 - 预制菜厨房', {
             fontSize: '18px',
@@ -344,6 +349,35 @@ class GameScene extends Phaser.Scene {
         // 控制面板
         const panel = this.add.rectangle(station.x + 15, station.y, 15, 30, 0x696969);
         panel.setStrokeStyle(1, 0x2F4F4F);
+    }
+
+    // 绘制单独的组装台
+    drawSingleWorkstation(workstation) {
+        const size = 60; // 组装台尺寸
+        
+        // 绘制组装台背景
+        const rect = this.add.rectangle(
+            workstation.x,
+            workstation.y,
+            size,
+            size,
+            0xDEB887, // 浅褐色
+            0.8
+        );
+        rect.setStrokeStyle(3, 0xCD853F); // 深褐色边框
+        
+        // 添加组装台标签
+        this.add.text(
+            workstation.x,
+            workstation.y,
+            '组装台',
+            {
+                fontSize: '12px',
+                fontFamily: 'Courier New',
+                color: '#8B4513',
+                fontStyle: 'bold'
+            }
+        ).setOrigin(0.5);
     }
 
     createPlayer() {
