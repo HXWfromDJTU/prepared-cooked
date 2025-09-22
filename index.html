@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Prepared Cooked - 预制菜大厨</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div id="game-container">
+        <div id="game-canvas"></div>
+        <div id="ui-overlay">
+            <div id="score-display">分数: <span id="score">0</span></div>
+            <div id="time-display">时间: <span id="time">03:00</span></div>
+            <div id="orders-panel">
+                <h3>订单</h3>
+                <div id="orders-list"></div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 游戏说明面板 -->
+    <div id="instructions-panel" class="hidden">
+        <div class="panel-content">
+            <h2>游戏说明</h2>
+            <div class="controls">
+                <h3>操作控制</h3>
+                <p><strong>移动:</strong> WASD 键或方向键</p>
+                <p><strong>交互:</strong> 空格键（拿取/放置/操作设备）</p>
+            </div>
+            <div class="gameplay">
+                <h3>游戏玩法</h3>
+                <p>1. 查看客户订单</p>
+                <p>2. 从储存区取预制食材</p>
+                <p>3. 将食材放入微波炉解冻</p>
+                <p>4. 解冻完成后组装菜品</p>
+                <p>5. 将完成的菜品上菜给客户</p>
+            </div>
+            <button id="close-instructions">开始游戏</button>
+        </div>
+    </div>
+
+    <!-- 引入Phaser.js -->
+    <script src="https://cdn.jsdelivr.net/npm/phaser@3.70.0/dist/phaser.min.js"></script>
+    
+    <!-- 引入游戏脚本 -->
+    <script src="js/utils/GameData.js"></script>
+    <script src="js/entities/Player.js"></script>
+    <script src="js/entities/Kitchen.js"></script>
+    <script src="js/entities/Food.js"></script>
+    <script src="js/systems/OrderSystem.js"></script>
+    <script src="js/systems/ScoreSystem.js"></script>
+    <script src="js/scenes/MenuScene.js"></script>
+    <script src="js/scenes/GameScene.js"></script>
+    <script src="js/main.js"></script>
+</body>
+</html>
