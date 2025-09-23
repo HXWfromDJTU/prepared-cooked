@@ -16,14 +16,21 @@ class PreparedCookedGame {
     }
 
     setupGame() {
+        // 确保gameData已经加载
+        if (!window.gameData) {
+            console.error('GameData not loaded yet, retrying...');
+            setTimeout(() => this.setupGame(), 100);
+            return;
+        }
+        
         // 设置游戏说明面板事件
         this.setupInstructions();
         
         // 创建Phaser游戏配置
         const config = {
             type: Phaser.AUTO,
-            width: gameData.config.gameWidth,
-            height: gameData.config.gameHeight,
+            width: window.gameData.config.gameWidth,
+            height: window.gameData.config.gameHeight,
             parent: 'game-canvas',
             backgroundColor: '#FFF8DC',
             physics: {
@@ -85,7 +92,7 @@ class PreparedCookedGame {
         console.log(`游戏结束! 最终分数: ${finalScore}`);
         
         // 检查是否创造新纪录
-        const isNewRecord = gameData.saveHighScore(finalScore);
+        const isNewRecord = window.gameData.saveHighScore(finalScore);
         
         if (isNewRecord) {
             console.log('恭喜！创造了新纪录！');
@@ -105,7 +112,7 @@ class PreparedCookedGame {
                 <div class="score-display">
                     <h3>最终分数: ${score}</h3>
                     ${isNewRecord ? '<p class="new-record">🎉 新纪录！</p>' : ''}
-                    <p>最高分: ${gameData.getHighScore()}</p>
+                    <p>最高分: ${window.gameData.getHighScore()}</p>
                 </div>
                 <div class="buttons">
                     <button id="restart-game">再来一局</button>
@@ -201,7 +208,7 @@ class PreparedCookedGame {
                 orderElement.className = 'order-item';
                 orderElement.setAttribute('data-order-id', order.id);
                 
-                const ingredients = order.recipe.ingredients.map(id => gameData.getIngredient(id).name).join(', ');
+                const ingredients = order.recipe.ingredients.map(id => window.gameData.getIngredient(id).name).join(', ');
                 
                 orderElement.innerHTML = `
                     <div class="dish-name">${order.recipe.name}</div>

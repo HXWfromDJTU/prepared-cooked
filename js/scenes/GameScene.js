@@ -57,7 +57,7 @@ class GameScene extends Phaser.Scene {
         
         // 重置游戏状态
         this.gameState.score = 0;
-        this.gameState.timeLeft = gameData.config.gameTime;
+        this.gameState.timeLeft = window.gameData.config.gameTime;
         this.gameState.orders = [];
     }
 
@@ -70,8 +70,8 @@ class GameScene extends Phaser.Scene {
     }
 
     drawKitchenAreas() {
-        const layout = gameData.kitchenLayout;
-        const config = gameData.config;
+        const layout = window.gameData.kitchenLayout;
+        const config = window.gameData.config;
         
         // 绘制网格线
         this.drawGridLines();
@@ -101,7 +101,7 @@ class GameScene extends Phaser.Scene {
     // 绘制回字形通道区域
     drawWalkwayAreas(layout, config) {
         // 绘制外圈通道（浅色地板）
-        const outerPixel = gameData.gridToPixel(layout.outerWalkway.gridX, layout.outerWalkway.gridY);
+        const outerPixel = window.gameData.gridToPixel(layout.outerWalkway.gridX, layout.outerWalkway.gridY);
         const outerFloor = this.add.rectangle(
             outerPixel.x + (layout.outerWalkway.gridWidth * config.gridSize) / 2 - config.gridSize / 2,
             outerPixel.y + (layout.outerWalkway.gridHeight * config.gridSize) / 2 - config.gridSize / 2,
@@ -112,7 +112,7 @@ class GameScene extends Phaser.Scene {
         outerFloor.setStrokeStyle(1, 0xDEB887);
         
         // 绘制内圈通道（更浅色地板）
-        const innerPixel = gameData.gridToPixel(layout.innerWalkway.gridX, layout.innerWalkway.gridY);
+        const innerPixel = window.gameData.gridToPixel(layout.innerWalkway.gridX, layout.innerWalkway.gridY);
         const innerFloor = this.add.rectangle(
             innerPixel.x + (layout.innerWalkway.gridWidth * config.gridSize) / 2 - config.gridSize / 2,
             innerPixel.y + (layout.innerWalkway.gridHeight * config.gridSize) / 2 - config.gridSize / 2,
@@ -140,7 +140,7 @@ class GameScene extends Phaser.Scene {
 
     // 绘制网格线
     drawGridLines() {
-        const config = gameData.config;
+        const config = window.gameData.config;
         const graphics = this.add.graphics();
         graphics.lineStyle(1, 0xCCCCCC, 0.5);
 
@@ -163,8 +163,8 @@ class GameScene extends Phaser.Scene {
 
     // 绘制网格化工作台
     drawGridWorkstation(station) {
-        const pixel = gameData.gridToPixel(station.gridX, station.gridY);
-        const config = gameData.config;
+        const pixel = window.gameData.gridToPixel(station.gridX, station.gridY);
+        const config = window.gameData.config;
         
         // 计算工作台的像素尺寸
         const width = station.gridWidth * config.gridSize;
@@ -256,8 +256,8 @@ class GameScene extends Phaser.Scene {
 
     // 为料理台添加图标
     addCookingCounterIcon(station, pixel, width, height) {
-        const centerX = pixel.x + width / 2 - gameData.config.gridSize / 2;
-        const centerY = pixel.y + height / 2 - gameData.config.gridSize / 2;
+        const centerX = pixel.x + width / 2 - window.gameData.config.gridSize / 2;
+        const centerY = pixel.y + height / 2 - window.gameData.config.gridSize / 2;
         
         // 添加简单的料理台图标 - 小圆点表示可放置食材
         const icon = this.add.circle(centerX + 15, centerY - 8, 3, 0x8B4513, 0.6);
@@ -381,8 +381,8 @@ class GameScene extends Phaser.Scene {
     }
 
     createPlayer() {
-        const startGrid = gameData.kitchenLayout.playerStart;
-        const startPixel = gameData.gridToPixel(startGrid.gridX, startGrid.gridY);
+        const startGrid = window.gameData.kitchenLayout.playerStart;
+        const startPixel = window.gameData.gridToPixel(startGrid.gridX, startGrid.gridY);
         this.player = new Player(this, startPixel.x, startPixel.y);
     }
 
