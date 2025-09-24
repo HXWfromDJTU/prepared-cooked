@@ -76,12 +76,16 @@ export class ItemManager {
     return true;
   }
 
-  // 更新解冻进度
+  // 更新解冻进度（只有在微波炉中的食材才能继续解冻）
   public updateThawing(): void {
     const thawDuration = 5000; // 5秒解冻时间
 
     this.items.forEach(item => {
-      if (item.state === ItemState.THAWING && item.thawStartTime) {
+      // 重要修复：只有在微波炉中的解冻食材才能继续解冻进度
+      if (item.state === ItemState.THAWING && 
+          item.location === ItemLocation.IN_MICROWAVE && 
+          item.thawStartTime) {
+        
         const elapsed = this.scene.time.now - item.thawStartTime;
         item.thawProgress = Math.min(elapsed / thawDuration, 1);
 
@@ -93,6 +97,7 @@ export class ItemManager {
         // 更新精灵显示
         this.updateItemSprite(item);
       }
+      // 不在微波炉中的解冻食材保持当前解冻进度，不再继续解冻
     });
   }
 
@@ -219,13 +224,13 @@ export class ItemManager {
     }
   }
 
-  // 获取状态颜色
+  // 获取状态颜色 (严格按照PROJECT_GUIDELINES要求)
   private getStateColor(state: ItemState): number {
     switch (state) {
-      case ItemState.FROZEN: return 0x87CEEB; // 天蓝色
-      case ItemState.THAWING: return 0xFFD700; // 金色
-      case ItemState.THAWED: return 0x32CD32; // 绿色
-      case ItemState.READY: return 0x32CD32; // 绿色
+      case ItemState.FROZEN: return 0x0000FF; // 蓝色
+      case ItemState.THAWING: return 0xFFFF00; // 黄色
+      case ItemState.THAWED: return 0xFF0000; // 红色
+      case ItemState.READY: return 0x00FF00; // 绿色（碟子等）
       default: return 0x888888;
     }
   }
@@ -262,14 +267,25 @@ export class ItemManager {
     item.location = ItemLocation.IN_MICROWAVE;
     item.gridPosition = gridPosition;
 
-    // 如果是冷冻食材，开始解冻
+    const thawDuration = 5000; // 5秒解冻时间，与updateThawing保持一致
+
     if (item.state === ItemState.FROZEN) {
+      // 全新开始解冻
       item.state = ItemState.THAWING;
       item.thawStartTime = this.scene.time.now;
       item.thawProgress = 0;
       console.log(`将 ${this.getIngredientName(item.ingredientType!)} 放入微波炉开始解冻`);
-    } else {
-      console.log(`将 ${this.getIngredientName(item.ingredientType!)} 放入微波炉`);
+    } else if (item.state === ItemState.THAWING) {
+      // 重要修复：继续之前的解冻进度
+      const currentProgress = item.thawProgress || 0;
+      // 调整开始时间，使得已有进度能够正确计算
+      item.thawStartTime = this.scene.time.now - (currentProgress * thawDuration);
+      
+      const percentage = Math.floor(currentProgress * 100);
+      console.log(`将 ${this.getIngredientName(item.ingredientType!)} 放入微波炉继续解冻 (从${percentage}%继续)`);
+    } else if (item.state === ItemState.THAWED) {
+      // 已完全解冻的食材
+      console.log(`将已解冻的 ${this.getIngredientName(item.ingredientType!)} 放入微波炉`);
     }
 
     // 更新精灵位置
@@ -282,12 +298,20 @@ export class ItemManager {
     const item = this.items.get(itemId);
     if (!item || item.location !== ItemLocation.IN_MICROWAVE) return false;
 
-    const statusText = item.state === ItemState.THAWED ? '已解冻' : 
-                      item.state === ItemState.THAWING ? '解冻中' : '未解冻';
+    // 生成状态文本，包含解冻进度
+    let statusText: string;
+    if (item.state === ItemState.THAWED) {
+      statusText = '已解冻 100%';
+    } else if (item.state === ItemState.THAWING && item.thawProgress !== undefined) {
+      const percentage = Math.floor(item.thawProgress * 100);
+      statusText = `解冻中 ${percentage}% - 进度已停止`;
+    } else {
+      statusText = '未解冻';
+    }
     
     console.log(`从微波炉取出 ${this.getIngredientName(item.ingredientType!)} (${statusText})`);
 
-    // 更新物品位置为玩家手中
+    // 更新物品位置为玩家手中（重要：这会导致解冻进度停止）
     item.location = ItemLocation.PLAYER_HAND;
     item.gridPosition = undefined;
 

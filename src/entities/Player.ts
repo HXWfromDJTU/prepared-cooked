@@ -234,13 +234,13 @@ export class Player extends Phaser.GameObjects.Rectangle {
     }
   }
 
-  // 获取状态颜色
+  // 获取状态颜色 (严格按照PROJECT_GUIDELINES要求)
   private getStateColor(state: string): number {
     switch (state) {
-      case 'frozen': return 0x87CEEB; // 天蓝色
-      case 'thawing': return 0xFFD700; // 金色
-      case 'thawed': return 0x32CD32; // 绿色
-      case 'ready': return 0x32CD32; // 绿色
+      case 'frozen': return 0x0000FF; // 蓝色
+      case 'thawing': return 0xFFFF00; // 黄色
+      case 'thawed': return 0xFF0000; // 红色
+      case 'ready': return 0x00FF00; // 绿色
       default: return 0x888888;
     }
   }

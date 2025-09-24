@@ -14,6 +14,7 @@ export class MainScene extends Phaser.Scene {
   private lastMoveTime: number = 0;
   private moveDelay: number = 200; // 移动输入间隔，防止过于灵敏
   private score: number = 0;
+  private microwaveProgressUI: Phaser.GameObjects.Container | null = null; // 微波炉进度条UI
 
   constructor() {
     super({ key: 'MainScene' });
@@ -44,11 +45,14 @@ export class MainScene extends Phaser.Scene {
 
     // 创建一些初始碟子在桌面上
     this.createInitialPlates();
+    
+    // 创建初始的预制菜在桌面上
+    this.createInitialPreparedFood();
 
     // 添加UI文本显示控制说明和状态
     this.createUI();
 
-    console.log('MVP-1: 主场景创建完成');
+    console.log('MVP-2: 主场景创建完成');
     console.log('- 使用 WASD 或方向键移动');
     console.log('- 使用 空格键 与面向的设备交互');
   }
@@ -58,6 +62,12 @@ export class MainScene extends Phaser.Scene {
     
     // 更新物品系统（解冻进度等）
     this.itemManager.updateThawing();
+    
+    // 更新微波炉进度条UI
+    this.updateMicrowaveUI();
+    
+    // 更新玩家手持物品显示状态
+    this.player.updateHeldItemDisplay();
     
     // 处理玩家移动（网格移动需要防抖）
     if (currentTime - this.lastMoveTime > this.moveDelay) {
@@ -130,6 +140,7 @@ export class MainScene extends Phaser.Scene {
       this.showInteractionFeedback('微波炉是空的', microwaveGrid);
     }
   }
+
 
   // 处理桌面交互
   private handleDeskInteraction(deskGrid: { x: number; y: number }): void {
@@ -313,7 +324,10 @@ export class MainScene extends Phaser.Scene {
       const baseName = this.getIngredientName(item.ingredientType);
       switch (item.state) {
         case 'frozen': return `${baseName}（冷冻）`;
-        case 'thawing': return `${baseName}（解冻中）`;
+        case 'thawing': 
+          // 显示解冻进度百分比
+          const percentage = item.thawProgress ? Math.floor(item.thawProgress * 100) : 0;
+          return `${baseName}（解冻中 ${percentage}%）`;
         case 'thawed': return `${baseName}（已解冻）`;
         default: return baseName;
       }
@@ -364,5 +378,50 @@ export class MainScene extends Phaser.Scene {
         this.mapManager.placeItem(pos.x, pos.y, plate);
       }
     });
+  }
+
+  // 创建初始预制菜
+  private createInitialPreparedFood(): void {
+    // 在桌面上放置一些初始的冷冻预制菜（蓝色方块）
+    const foodPositions = [
+      { x: 3, y: 2, type: IngredientType.HUANG_MI_GAOOU },  // 左上桌面 - 黄米凉糕
+      { x: 16, y: 2, type: IngredientType.MANTOU },         // 右上桌面 - 小馒头
+      { x: 10, y: 6, type: IngredientType.FANQIE_NIUROU },  // 中央工作岛 - 番茄牛腩
+      { x: 3, y: 11, type: IngredientType.RICE },           // 左下桌面 - 米饭
+    ];
+
+    foodPositions.forEach(pos => {
+      if (this.mapManager.canPlaceItem(pos.x, pos.y)) {
+        const ingredient = this.itemManager.createIngredient(pos.type, ItemLocation.ON_DESK, pos);
+        this.mapManager.placeItem(pos.x, pos.y, ingredient);
+      }
+    });
+
+    console.log('在桌面上放置了4个初始预制菜（冷冻状态）');
+  }
+
+  // 更新微波炉进度条UI
+  private updateMicrowaveUI(): void {
+    const microwavePos = { x: 1, y: 1 }; // 微波炉位置
+    
+    // 检查微波炉是否有物品
+    const microwaveItem = this.itemManager.getItemAtPosition(microwavePos.x, microwavePos.y);
+    
+    if (microwaveItem && microwaveItem.state === 'thawing') {
+      // 有物品在解冻，显示/更新进度条
+      if (this.microwaveProgressUI) {
+        // 销毁旧的进度条
+        this.microwaveProgressUI.destroy();
+      }
+      
+      // 创建新的进度条
+      this.microwaveProgressUI = this.itemManager.renderMicrowaveUI(microwavePos.x, microwavePos.y);
+    } else {
+      // 没有物品在解冻，隐藏进度条
+      if (this.microwaveProgressUI) {
+        this.microwaveProgressUI.destroy();
+        this.microwaveProgressUI = null;
+      }
+    }
   }
 }

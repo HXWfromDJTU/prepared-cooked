@@ -90,7 +90,6 @@ export class MapManager {
     // 洗碗池 (右上角，底部和左侧有地面可以接近)
     this.setTile(18, 1, TileType.SINK, false, false);
     
-    
     // 出餐口 (右下角，顶部和左侧有地面可以接近)
     this.setTile(18, 13, TileType.SERVING, false, false);
   }
