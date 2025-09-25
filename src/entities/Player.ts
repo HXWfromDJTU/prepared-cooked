@@ -11,9 +11,10 @@ export class Player extends Phaser.GameObjects.Rectangle {
   constructor(scene: Phaser.Scene, mapManager: MapManager, gridX: number, gridY: number) {
     const worldPos = mapManager.gridToWorld(gridX, gridY);
     
-    // 创建30x30的红色方块作为玩家角色（稍小以适配格子）
+    // 必须先调用super()
     super(scene, worldPos.x, worldPos.y, 30, 30, 0xe74c3c);
     
+    // 然后才能设置this的属性
     this.mapManager = mapManager;
     
     // 添加到场景
@@ -260,5 +261,45 @@ export class Player extends Phaser.GameObjects.Rectangle {
       return '碟子';
     }
     return '未知物品';
+  }
+
+  // 设置玩家位置（用于重新开始游戏）
+  public setPosition(gridX: number, gridY: number): void {
+    // 检查mapManager是否已初始化
+    if (!this.mapManager) {
+      console.warn('MapManager not initialized, skipping setPosition');
+      return;
+    }
+    
+    const worldPos = this.mapManager.gridToWorld(gridX, gridY);
+    this.x = worldPos.x;
+    this.y = worldPos.y;
+    
+    // 更新手持物品位置
+    this.updateHeldItemPosition();
+  }
+
+  // 清除手持物品
+  public clearHeldItem(): void {
+    this.heldItem = null;
+    if (this.heldItemSprite) {
+      this.heldItemSprite.destroy();
+      this.heldItemSprite = null;
+    }
+  }
+
+  // 重置玩家到指定网格位置（用于游戏重新开始）
+  public resetToGridPosition(gridX: number, gridY: number): void {
+    if (this.mapManager) {
+      const worldPos = this.mapManager.gridToWorld(gridX, gridY);
+      this.x = worldPos.x;
+      this.y = worldPos.y;
+      
+      // 清除手持物品
+      this.clearHeldItem();
+      
+      // 更新手持物品位置
+      this.updateHeldItemPosition();
+    }
   }
 }

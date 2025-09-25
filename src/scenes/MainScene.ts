@@ -17,6 +17,13 @@ export class MainScene extends Phaser.Scene {
   private moveDelay: number = 200; // 移动输入间隔，防止过于灵敏
   private score: number = 0;
   private microwaveProgressUI: Phaser.GameObjects.Container | null = null; // 微波炉进度条UI
+  
+  // 第三阶段：游戏时间和结束逻辑
+  private gameTimeLimit: number = 180000; // 3分钟 = 180秒 = 180000毫秒
+  private gameStartTime: number = 0;
+  private gameTimeRemaining: number = 180000;
+  private isGameActive: boolean = true;
+  private gameEndUI: Phaser.GameObjects.Container | null = null;
 
   constructor() {
     super({ key: 'MainScene' });
@@ -56,39 +63,53 @@ export class MainScene extends Phaser.Scene {
 
     // 添加UI文本显示控制说明和状态
     this.createUI();
+    
+    // 第三阶段：启动游戏计时
+    this.startGameTimer();
 
-    console.log('MVP-2: 主场景创建完成');
+    console.log('MVP-3: 主场景创建完成');
     console.log('- 使用 WASD 或方向键移动');
     console.log('- 使用 空格键 与面向的设备交互');
+    console.log('- 游戏时长：3分钟');
   }
 
   update(): void {
     const currentTime = this.time.now;
     
-    // 更新物品系统（解冻进度等）
-    this.itemManager.updateThawing();
-    
-    // 更新订单系统
-    this.orderManager.update(currentTime);
-    
-    // 更新微波炉进度条UI
-    this.updateMicrowaveUI();
-    
-    // 更新玩家手持物品显示状态
-    this.player.updateHeldItemDisplay();
-    
-    // 处理玩家移动（网格移动需要防抖）
-    if (currentTime - this.lastMoveTime > this.moveDelay) {
-      const direction = this.inputManager.getMovementDirection();
-      if (direction && !this.player.isCurrentlyMoving()) {
-        this.player.tryMove(direction);
-        this.lastMoveTime = currentTime;
+    // 第三阶段：检查游戏是否结束
+    if (this.isGameActive) {
+      this.updateGameTimer(currentTime);
+      
+      // 更新物品系统（解冻进度等）
+      this.itemManager.updateThawing();
+      
+      // 更新订单系统
+      this.orderManager.update(currentTime);
+      
+      // 更新微波炉进度条UI
+      this.updateMicrowaveUI();
+      
+      // 更新玩家手持物品显示状态
+      this.player.updateHeldItemDisplay();
+      
+      // 处理玩家移动（网格移动需要防抖）
+      if (currentTime - this.lastMoveTime > this.moveDelay) {
+        const direction = this.inputManager.getMovementDirection();
+        if (direction && !this.player.isCurrentlyMoving()) {
+          this.player.tryMove(direction);
+          this.lastMoveTime = currentTime;
+        }
       }
-    }
 
-    // 处理交互按键
-    if (this.inputManager.isInteractPressed()) {
-      this.handleInteraction();
+      // 处理交互按键
+      if (this.inputManager.isInteractPressed()) {
+        this.handleInteraction();
+      }
+    } else {
+      // 游戏结束后，只处理重新开始按键
+      if (this.inputManager.isRestartPressed()) {
+        this.restartGame();
+      }
     }
   }
 
@@ -286,6 +307,11 @@ export class MainScene extends Phaser.Scene {
           scoreElement.textContent = `分数: ${this.score}`;
         }
         
+        // 更新游戏计时器（在createUI中调用，所以这里也需要更新）
+        if (this.isGameActive) {
+          this.updateTimerUI();
+        }
+        
         // 更新玩家状态
         const playerGrid = this.player.getGridPosition();
         const facingGrid = this.player.getFacingGridPosition();
@@ -382,6 +408,213 @@ export class MainScene extends Phaser.Scene {
     };
     
     return names[typeKey] || '未知食材';
+  }
+
+  // 第三阶段：游戏计时器相关方法
+  private startGameTimer(): void {
+    this.gameStartTime = this.time.now;
+    this.gameTimeRemaining = this.gameTimeLimit;
+    console.log('🎮 游戏开始！时间限制：3分钟');
+  }
+
+  private updateGameTimer(currentTime: number): void {
+    const elapsedTime = currentTime - this.gameStartTime;
+    this.gameTimeRemaining = Math.max(0, this.gameTimeLimit - elapsedTime);
+    
+    // 更新倒计时UI
+    this.updateTimerUI();
+    
+    // 检查游戏是否结束
+    if (this.gameTimeRemaining <= 0 && this.isGameActive) {
+      this.endGame();
+    }
+  }
+
+  private updateTimerUI(): void {
+    const timerElement = document.getElementById('game-timer');
+    if (timerElement) {
+      const minutes = Math.floor(this.gameTimeRemaining / 60000);
+      const seconds = Math.floor((this.gameTimeRemaining % 60000) / 1000);
+      timerElement.textContent = `时间: ${minutes}:${seconds.toString().padStart(2, '0')}`;
+      
+      // 时间紧张时改变颜色
+      if (this.gameTimeRemaining < 30000) { // 最后30秒
+        timerElement.style.color = '#e74c3c';
+      } else if (this.gameTimeRemaining < 60000) { // 最后1分钟
+        timerElement.style.color = '#f39c12';
+      } else {
+        timerElement.style.color = '#27ae60';
+      }
+    }
+  }
+
+  private endGame(): void {
+    this.isGameActive = false;
+    console.log('🏁 游戏结束！');
+    console.log(`📊 最终分数：${this.score}`);
+    
+    // 显示游戏结束界面
+    this.showGameEndUI();
+  }
+
+  private showGameEndUI(): void {
+    // 创建游戏结束遮罩
+    const gameEndOverlay = document.createElement('div');
+    gameEndOverlay.id = 'game-end-overlay';
+    gameEndOverlay.style.cssText = `
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0, 0, 0, 0.8);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 1000;
+      animation: fadeIn 0.5s ease-out;
+    `;
+
+    // 创建结算面板
+    const endPanel = document.createElement('div');
+    endPanel.style.cssText = `
+      background-color: #34495e;
+      border: 3px solid #3498db;
+      border-radius: 15px;
+      padding: 30px;
+      text-align: center;
+      color: #ecf0f1;
+      box-shadow: 0 8px 16px rgba(0, 0, 0, 0.5);
+      animation: slideInUp 0.5s ease-out;
+    `;
+
+    // 计算星级评价
+    const stars = this.calculateStars(this.score);
+    const starDisplay = '⭐'.repeat(stars) + '☆'.repeat(3 - stars);
+
+    endPanel.innerHTML = `
+      <h2 style="color: #3498db; margin: 0 0 20px 0; font-size: 24px;">🏁 游戏结束！</h2>
+      <div style="font-size: 48px; color: #e74c3c; margin: 20px 0;">${this.score}</div>
+      <div style="font-size: 18px; margin: 10px 0;">最终分数</div>
+      <div style="font-size: 32px; margin: 20px 0;">${starDisplay}</div>
+      <div style="font-size: 14px; color: #bdc3c7; margin: 20px 0;">
+        ${this.getScoreComment(this.score)}
+      </div>
+      <button id="restart-btn" style="
+        background-color: #27ae60;
+        color: white;
+        border: none;
+        padding: 12px 24px;
+        font-size: 16px;
+        border-radius: 8px;
+        cursor: pointer;
+        margin: 10px;
+        transition: background-color 0.3s;
+      ">🔄 重新开始</button>
+      <button id="menu-btn" style="
+        background-color: #95a5a6;
+        color: white;
+        border: none;
+        padding: 12px 24px;
+        font-size: 16px;
+        border-radius: 8px;
+        cursor: pointer;
+        margin: 10px;
+        transition: background-color 0.3s;
+      ">📋 主菜单</button>
+    `;
+
+    // 添加按钮事件
+    gameEndOverlay.appendChild(endPanel);
+    document.body.appendChild(gameEndOverlay);
+
+    // 重新开始按钮
+    const restartBtn = document.getElementById('restart-btn');
+    if (restartBtn) {
+      restartBtn.addEventListener('click', () => {
+        this.restartGame();
+      });
+      restartBtn.addEventListener('mouseenter', () => {
+        restartBtn.style.backgroundColor = '#2ecc71';
+      });
+      restartBtn.addEventListener('mouseleave', () => {
+        restartBtn.style.backgroundColor = '#27ae60';
+      });
+    }
+
+    // 主菜单按钮（暂时也是重新开始）
+    const menuBtn = document.getElementById('menu-btn');
+    if (menuBtn) {
+      menuBtn.addEventListener('click', () => {
+        this.restartGame();
+      });
+      menuBtn.addEventListener('mouseenter', () => {
+        menuBtn.style.backgroundColor = '#7f8c8d';
+      });
+      menuBtn.addEventListener('mouseleave', () => {
+        menuBtn.style.backgroundColor = '#95a5a6';
+      });
+    }
+
+    // 添加CSS动画
+    const style = document.createElement('style');
+    style.textContent = `
+      @keyframes fadeIn {
+        from { opacity: 0; }
+        to { opacity: 1; }
+      }
+      @keyframes slideInUp {
+        from { transform: translateY(50px); opacity: 0; }
+        to { transform: translateY(0); opacity: 1; }
+      }
+    `;
+    document.head.appendChild(style);
+  }
+
+  private calculateStars(score: number): number {
+    if (score >= 800) return 3;
+    if (score >= 400) return 2;
+    if (score >= 100) return 1;
+    return 0;
+  }
+
+  private getScoreComment(score: number): string {
+    if (score >= 1000) return '🏆 预制菜大师！完美的厨房管理！';
+    if (score >= 800) return '👨‍🍳 优秀厨师！效率很高！';
+    if (score >= 600) return '👍 不错的表现！继续努力！';
+    if (score >= 400) return '😊 还可以，多练习会更好！';
+    if (score >= 200) return '🤔 需要提高效率哦！';
+    return '😅 多熟悉一下流程吧！';
+  }
+
+  private restartGame(): void {
+    // 移除游戏结束UI
+    const overlay = document.getElementById('game-end-overlay');
+    if (overlay) {
+      overlay.remove();
+    }
+
+    // 重置游戏状态
+    this.score = 0;
+    this.isGameActive = true;
+    this.gameTimeRemaining = this.gameTimeLimit;
+    this.gameStartTime = this.time.now;
+
+    // 重置订单管理器
+    this.orderManager = new OrderManager(this);
+
+    // 重置物品管理器
+    this.itemManager = new ItemManager(this);
+
+    // 重新渲染地图和初始物品
+    this.mapManager.renderMap();
+    this.createInitialPlates();
+    this.createInitialPreparedFood();
+
+    // 重置玩家位置
+    this.player.resetToGridPosition(7, 7);
+
+    console.log('🔄 游戏重新开始！');
   }
 
   // 获取物品名称

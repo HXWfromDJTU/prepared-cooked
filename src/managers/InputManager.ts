@@ -10,6 +10,7 @@ export class InputManager {
     d: Phaser.Input.Keyboard.Key;
   };
   private spaceKey: Phaser.Input.Keyboard.Key;
+  private rKey: Phaser.Input.Keyboard.Key;
 
   constructor(scene: Phaser.Scene) {
     this.scene = scene;
@@ -21,6 +22,7 @@ export class InputManager {
       d: this.scene.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.D)
     };
     this.spaceKey = this.scene.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
+    this.rKey = this.scene.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.R);
   }
 
   public getMovementDirection(): Direction | null {
@@ -41,5 +43,9 @@ export class InputManager {
 
   public isInteractPressed(): boolean {
     return Phaser.Input.Keyboard.JustDown(this.spaceKey);
+  }
+
+  public isRestartPressed(): boolean {
+    return Phaser.Input.Keyboard.JustDown(this.rKey);
   }
 }
