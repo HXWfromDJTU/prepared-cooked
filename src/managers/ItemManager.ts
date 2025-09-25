@@ -447,27 +447,14 @@ export class ItemManager {
       // 转换为完成的菜品
       plate.type = ItemType.DISH;
       plate.dishType = dishType;
-      console.log(`自动组装完成：${this.getDishName(dishType)}`);
+      console.log(`自动组装完成：${this.getDishNameByType(dishType)}`);
       return true;
     }
     
     return false;
   }
 
-  // 获取菜品中文名
-  private getDishName(dishType: DishType): string {
-    const dishNames = {
-      [DishType.HUANG_MI_LIANGGAO]: '黄米凉糕',
-      [DishType.XIAO_MANTOU]: '小馒头',
-      [DishType.XIBEI_MIANJIN_DISH]: '西贝面筋',
-      [DishType.FANQIE_NIUROU_FAN]: '番茄牛腩饭',
-      [DishType.ZICAI_DANHUA_TANG]: '紫菜蛋花汤',
-      [DishType.ZHANGYE_KONGXIN_GUAMIAN]: '张爷爷空心挂面',
-      [DishType.NIUDAGU_TAOCAN]: '牛大骨套餐',
-      [DishType.HUANGMEN_JI_MIFAN]: '黄焖鸡米饭'
-    };
-    return dishNames[dishType] || '未知菜品';
-  }
+
 
   // 创建组合菜品（支持多食材） - 保留原方法用于直接创建
   public createDish(plateId: string, ...ingredientIds: string[]): Item | null {
@@ -530,7 +517,7 @@ export class ItemManager {
       // 成功上菜
       result = {
         success: true,
-        message: `成功上菜：${this.getDishName(item.ingredientType!)}`,
+        message: `成功上菜：${this.getDishNameByType(item.dishType!)}`,
         score: 100
       };
     } else if (item.type === ItemType.INGREDIENT) {
@@ -641,17 +628,7 @@ export class ItemManager {
     }
   }
 
-  // 获取菜品名称（旧版本兼容）
-  private getDishName(ingredientType: IngredientType): string {
-    switch (ingredientType) {
-      case IngredientType.HUANG_MI_GAOOU: return '黄米凉糕';
-      case IngredientType.MANTOU: return '蒸小馒头';
-      case IngredientType.XIBEI_MIANJIN: return '炒西贝面筋';
-      case IngredientType.FANQIE_NIUROU: return '番茄牛腩盖饭';
-      case IngredientType.RICE: return '白米饭';
-      default: return '未知菜品';
-    }
-  }
+
 
   // 获取所有物品（用于调试）
   public getAllItems(): Item[] {

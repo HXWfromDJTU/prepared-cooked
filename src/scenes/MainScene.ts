@@ -2,14 +2,16 @@ import { InputManager } from '../managers/InputManager';
 import { MapManager } from '../managers/MapManager';
 import { ItemManager } from '../managers/ItemManager';
 import { OrderManager } from '../managers/OrderManager';
+import { PlateManager } from '../managers/PlateManager';
 import { Player } from '../entities/Player';
-import { TileType, IngredientType, ItemType, ItemLocation, DishType } from '../types';
+import { TileType, IngredientType, ItemType, ItemLocation, DishType, ItemState } from '../types';
 
 export class MainScene extends Phaser.Scene {
   private inputManager!: InputManager;
   private mapManager!: MapManager;
   private itemManager!: ItemManager;
   private orderManager!: OrderManager;
+  private plateManager!: PlateManager; // 第四阶段：盘子管理器
   private player!: Player;
   private gameWidth: number = 800;
   private gameHeight: number = 600;
@@ -17,6 +19,7 @@ export class MainScene extends Phaser.Scene {
   private moveDelay: number = 200; // 移动输入间隔，防止过于灵敏
   private score: number = 0;
   private microwaveProgressUI: Phaser.GameObjects.Container | null = null; // 微波炉进度条UI
+  private dishwasherProgressUI: Phaser.GameObjects.Container | null = null; // 第四阶段：洗碗池进度条UI
   
   // 第三阶段：游戏时间和结束逻辑
   private gameTimeLimit: number = 180000; // 3分钟 = 180秒 = 180000毫秒
@@ -46,8 +49,14 @@ export class MainScene extends Phaser.Scene {
     // 创建订单管理器
     this.orderManager = new OrderManager(this);
     
+    // 第四阶段：创建盘子管理器
+    this.plateManager = new PlateManager(this);
+    
     // 渲染地图
     this.mapManager.renderMap();
+    
+    // 初始化桌面盘子
+    this.plateManager.initializePlatesOnTables();
 
     // 在安全的地面位置创建玩家角色（起始位置：网格坐标7,7 - 确保是地面）
     this.player = new Player(this, this.mapManager, 7, 7);
@@ -83,11 +92,17 @@ export class MainScene extends Phaser.Scene {
       // 更新物品系统（解冻进度等）
       this.itemManager.updateThawing();
       
+      // 第四阶段：更新盘子管理系统（洗碗进度等）
+      this.plateManager.updateWashing();
+      
       // 更新订单系统
       this.orderManager.update(currentTime);
       
       // 更新微波炉进度条UI
       this.updateMicrowaveUI();
+      
+      // 第四阶段：更新洗碗池进度条UI
+      this.updateDishwasherUI();
       
       // 更新玩家手持物品显示状态
       this.player.updateHeldItemDisplay();
@@ -105,6 +120,9 @@ export class MainScene extends Phaser.Scene {
       if (this.inputManager.isInteractPressed()) {
         this.handleInteraction();
       }
+      
+      // 检查持续洗碗状态
+      this.handleContinuousWashing();
     } else {
       // 游戏结束后，只处理重新开始按键
       if (this.inputManager.isRestartPressed()) {
@@ -124,9 +142,8 @@ export class MainScene extends Phaser.Scene {
       case TileType.MICROWAVE:
         this.handleMicrowaveInteraction(facingGrid);
         break;
-      case TileType.SINK:
-        console.log('洗碗池功能暂未实现');
-        this.showInteractionFeedback('洗碗池（暂未实现）', facingGrid);
+      case TileType.DISHWASHER:
+        this.handleDishwasherInteraction(facingGrid);
         break;
       case TileType.SERVING:
         this.handleServingInteraction();
@@ -189,13 +206,58 @@ export class MainScene extends Phaser.Scene {
       this.mapManager.removeItem(deskGrid.x, deskGrid.y);
       this.showInteractionFeedback(`拾取：${this.getItemName(deskItem)}`, deskGrid);
     } else if (heldItem && deskItem) {
-      // 尝试将食材添加到盘子上
-      if (this.itemManager.canCombineItems(heldItem.id, deskItem.id)) {
+      // 第四阶段：检查是否需要盘子进行装盘
+      if (heldItem.type === ItemType.INGREDIENT && heldItem.state === ItemState.THAWED && 
+          deskItem.type === ItemType.PLATE) {
+        // 解冻食材 + 盘子 = 装盘
+        if (!this.plateManager.canPlate()) {
+          this.showInteractionFeedback('没有干净盘子可用！', deskGrid);
+          return;
+        }
+
+        // 直接使用桌面上的盘子进行组合
+        if (this.itemManager.addIngredientToPlate(deskItem.id, heldItem.id)) {
+          const plate = this.itemManager.getItem(deskItem.id);
+          
+          // 更新玩家手持物品
+          this.player.dropItem();
+          this.player.pickUpItem(plate!);
+          this.mapManager.removeItem(deskGrid.x, deskGrid.y);
+          
+          // 根据盘子状态显示反馈
+          if (plate?.type === ItemType.DISH) {
+            this.showInteractionFeedback(`菜品完成：${this.getItemName(plate)}`, deskGrid);
+          } else {
+            const ingredientName = this.getIngredientName(heldItem?.ingredientType);
+            this.showInteractionFeedback(`食材已添加：${ingredientName}`, deskGrid);
+          }
+        } else {
+          this.showInteractionFeedback('无法添加食材', deskGrid);
+        }
+      }
+      // 尝试将食材添加到盘子上（允许自由装盘）
+      else if ((heldItem.type === ItemType.PLATE && deskItem.type === ItemType.INGREDIENT) ||
+               (deskItem.type === ItemType.PLATE && heldItem.type === ItemType.INGREDIENT)) {
         const plateId = heldItem.type === ItemType.PLATE ? heldItem.id : deskItem.id;
         const ingredientId = heldItem.type === ItemType.INGREDIENT ? heldItem.id : deskItem.id;
         const ingredient = this.itemManager.getItem(ingredientId);
         
-        // 使用新的渐进式组合方法
+        // 检查食材状态并给出具体提示
+        if (ingredient?.state === ItemState.FROZEN) {
+          const ingredientName = this.getIngredientName(ingredient.ingredientType);
+          this.showInteractionFeedback(`${ingredientName}未解冻，不能放到盘子上`, deskGrid);
+          return;
+        } else if (ingredient?.state === ItemState.THAWING) {
+          const ingredientName = this.getIngredientName(ingredient.ingredientType);
+          this.showInteractionFeedback(`${ingredientName}正在解冻中，请等待完成`, deskGrid);
+          return;
+        } else if (ingredient?.state !== ItemState.THAWED) {
+          const ingredientName = this.getIngredientName(ingredient?.ingredientType);
+          this.showInteractionFeedback(`${ingredientName}状态异常，无法装盘`, deskGrid);
+          return;
+        }
+        
+        // 使用新的渐进式组合方法（允许自由装盘）
         if (this.itemManager.addIngredientToPlate(plateId, ingredientId)) {
           const plate = this.itemManager.getItem(plateId);
           
@@ -212,10 +274,11 @@ export class MainScene extends Phaser.Scene {
             this.showInteractionFeedback(`食材已添加：${ingredientName}`, deskGrid);
           }
         } else {
-          this.showInteractionFeedback('无法添加食材', deskGrid);
+          this.showInteractionFeedback('无法添加食材到盘子', deskGrid);
         }
       } else {
-        this.showInteractionFeedback('无法组合这些物品', deskGrid);
+        // 根据具体情况给出详细的提示
+        this.showDetailedCombinationFeedback(heldItem, deskItem, deskGrid);
       }
     } else {
       this.showInteractionFeedback('桌面是空的', deskGrid);
@@ -231,29 +294,93 @@ export class MainScene extends Phaser.Scene {
       return;
     }
 
-    // 检查是否为完成的菜品
-    if (heldItem.type !== ItemType.DISH || !heldItem.dishType) {
-      this.showInteractionFeedback('只能上菜完成的菜品', { x: 18, y: 13 });
-      return;
-    }
-
-    // 检查是否有匹配的订单
-    if (!this.orderManager.hasMatchingOrder(heldItem.dishType)) {
-      this.showInteractionFeedback('没有对应的订单', { x: 18, y: 13 });
-      return;
-    }
-
-    // 上菜成功，完成订单
+    // 上菜任何物品，出餐口"吞掉"物品
     const itemToServe = this.player.dropItem()!;
-    const orderCompleted = this.orderManager.completeOrder(heldItem.dishType);
     
-    if (orderCompleted) {
-      // 订单完成，物品已经上菜（从玩家手中移除）
-      this.showServeResult('✅ 订单完成！', true);
+    // 检查是否为完成的菜品且匹配订单
+    if (heldItem.type === ItemType.DISH && heldItem.dishType && 
+        this.orderManager.hasMatchingOrder(heldItem.dishType)) {
+      // 上菜成功
+      const orderCompleted = this.orderManager.completeOrder(heldItem.dishType);
+      if (orderCompleted) {
+        this.showServeResult('✅ 订单完成！', true);
+        // 20秒后生成脏盘子到洗碗池
+        this.scheduleDelayedDirtyPlate(20000);
+      }
     } else {
-      // 如果由于某种原因订单完成失败，返还物品给玩家
-      this.player.pickUpItem(itemToServe);
-      this.showServeResult('❌ 订单完成失败', false);
+      // 上错菜，扣分
+      this.updateScore(-50); // 扣除50分
+      this.showServeResult('❌ 上错菜！(-50分)', false);
+      
+      // 如果上错的菜品包含盘子，3秒后生成脏盘子到洗碗池
+      if (this.itemContainsPlate(itemToServe)) {
+        this.scheduleDelayedDirtyPlate(3000);
+      }
+    }
+    
+    // 物品被出餐口"吞掉"，不需要返还给玩家
+  }
+
+  // 第四阶段：处理洗碗池交互（只处理放入脏盘子）
+  private handleDishwasherInteraction(dishwasherGrid: { x: number; y: number }): void {
+    const heldItem = this.player.getHeldItem();
+    const dishwasherItem = this.mapManager.getDishwasherItem(dishwasherGrid.x, dishwasherGrid.y);
+
+    // 情况1：玩家手里有脏盘子，想放入洗碗池
+    if (heldItem && heldItem.type === ItemType.DIRTY_PLATE && !dishwasherItem) {
+      const dirtyPlate = this.player.dropItem()!;
+      this.mapManager.placeDishwasherItem(dishwasherGrid.x, dishwasherGrid.y, dirtyPlate);
+      this.showInteractionFeedback('脏盘子放入洗碗池', dishwasherGrid);
+      return;
+    }
+
+    // 情况2：洗碗池是空的
+    if (!dishwasherItem) {
+      this.showInteractionFeedback('洗碗池是空的', dishwasherGrid);
+      return;
+    }
+
+    // 情况3：其他情况
+    if (heldItem && dishwasherItem) {
+      this.showInteractionFeedback('洗碗池已有物品', dishwasherGrid);
+      return;
+    }
+
+    if (heldItem && heldItem.type !== ItemType.DIRTY_PLATE) {
+      this.showInteractionFeedback('只能放入脏盘子', dishwasherGrid);
+      return;
+    }
+
+    // 情况4：洗碗池有脏盘子，但这里不处理洗碗（由handleContinuousWashing处理）
+    if (!heldItem && dishwasherItem && dishwasherItem.type === ItemType.DIRTY_PLATE) {
+      this.showInteractionFeedback('按住操作键开始洗碗', dishwasherGrid);
+      return;
+    }
+  }
+
+  // 处理持续洗碗逻辑
+  private handleContinuousWashing(): void {
+    const facingGrid = this.player.getFacingGridPosition();
+    const facingTile = this.mapManager.getTile(facingGrid.x, facingGrid.y);
+    
+    // 检查是否面向洗碗池
+    if (facingTile && facingTile.type === TileType.DISHWASHER) {
+      const dishwasherItem = this.mapManager.getDishwasherItem(facingGrid.x, facingGrid.y);
+      const heldItem = this.player.getHeldItem();
+      
+      // 只有空手且洗碗池有脏盘子时才能洗碗
+      if (!heldItem && dishwasherItem && dishwasherItem.type === ItemType.DIRTY_PLATE) {
+        if (this.inputManager.isInteractHeld()) {
+          // 持续按住操作键，继续洗碗
+          this.plateManager.continuousWashing();
+        } else {
+          // 没有按住操作键，停止洗碗
+          this.plateManager.stopWashing();
+        }
+      }
+    } else {
+      // 不面向洗碗池，停止洗碗
+      this.plateManager.stopWashing();
     }
   }
 
@@ -296,6 +423,74 @@ export class MainScene extends Phaser.Scene {
     });
   }
 
+  // 检查物品是否包含盘子
+  private itemContainsPlate(item: any): boolean {
+    // 如果是盘子本身
+    if (item.type === ItemType.PLATE) return true;
+    
+    // 如果是菜品（菜品通常是用盘子装的）
+    if (item.type === ItemType.DISH) return true;
+    
+    // 如果是有items数组的盘子（装了食材的盘子）
+    if (item.items && Array.isArray(item.items)) return true;
+    
+    return false;
+  }
+
+  // 延迟生成脏盘子到洗碗池
+  private scheduleDelayedDirtyPlate(delay: number): void {
+    this.time.delayedCall(delay, () => {
+      this.plateManager.addDirtyPlateToSink();
+      console.log(`${delay/1000}秒后，脏盘子出现在洗碗池`);
+    });
+  }
+
+  // 根据具体情况给出详细的组合反馈
+  private showDetailedCombinationFeedback(heldItem: any, deskItem: any, deskGrid: { x: number; y: number }): void {
+    // 情况1: 两个都是食材
+    if (heldItem.type === ItemType.INGREDIENT && deskItem.type === ItemType.INGREDIENT) {
+      this.showInteractionFeedback('食材不能直接组合，需要先用盘子', deskGrid);
+      return;
+    }
+    
+    // 情况2: 两个都是盘子
+    if (heldItem.type === ItemType.PLATE && deskItem.type === ItemType.PLATE) {
+      this.showInteractionFeedback('不能将盘子放在另一个盘子上', deskGrid);
+      return;
+    }
+    
+    // 情况3: 两个都是菜品
+    if (heldItem.type === ItemType.DISH && deskItem.type === ItemType.DISH) {
+      this.showInteractionFeedback('不能将菜品放在另一个菜品上', deskGrid);
+      return;
+    }
+    
+    // 情况4: 菜品和食材
+    if ((heldItem.type === ItemType.DISH && deskItem.type === ItemType.INGREDIENT) ||
+        (heldItem.type === ItemType.INGREDIENT && deskItem.type === ItemType.DISH)) {
+      this.showInteractionFeedback('已完成的菜品不能再添加食材', deskGrid);
+      return;
+    }
+    
+    // 情况5: 菜品和盘子
+    if ((heldItem.type === ItemType.DISH && deskItem.type === ItemType.PLATE) ||
+        (heldItem.type === ItemType.PLATE && deskItem.type === ItemType.DISH)) {
+      this.showInteractionFeedback('已完成的菜品不需要额外的盘子', deskGrid);
+      return;
+    }
+    
+    // 情况6: 脏盘子相关
+    if (heldItem.type === ItemType.DIRTY_PLATE || deskItem.type === ItemType.DIRTY_PLATE) {
+      this.showInteractionFeedback('脏盘子需要先到洗碗池清洗', deskGrid);
+      return;
+    }
+    
+    // 情况7: 其他未知组合
+    const heldItemName = this.getItemName(heldItem);
+    const deskItemName = this.getItemName(deskItem);
+    this.showInteractionFeedback(`${heldItemName}和${deskItemName}无法组合`, deskGrid);
+  }
+
   private createUI(): void {
     // 实时更新玩家状态和分数，通过操作DOM元素而非游戏内文本
     this.time.addEvent({
@@ -305,6 +500,17 @@ export class MainScene extends Phaser.Scene {
         const scoreElement = document.getElementById('score-display');
         if (scoreElement) {
           scoreElement.textContent = `分数: ${this.score}`;
+        }
+        
+        // 第四阶段：更新盘子数量显示
+        const cleanPlatesElement = document.getElementById('clean-plates');
+        if (cleanPlatesElement) {
+          cleanPlatesElement.textContent = `干净盘子: ${this.plateManager.getCleanPlateCount()}`;
+        }
+        
+        const dirtyPlatesElement = document.getElementById('dirty-plates');
+        if (dirtyPlatesElement) {
+          dirtyPlatesElement.textContent = `脏盘子: ${this.plateManager.getDirtyPlateCount()}`;
         }
         
         // 更新游戏计时器（在createUI中调用，所以这里也需要更新）
@@ -361,7 +567,7 @@ export class MainScene extends Phaser.Scene {
       case TileType.FLOOR: return '地面';
       case TileType.DESK: return '桌面';
       case TileType.MICROWAVE: return '微波炉';
-      case TileType.SINK: return '洗碗池';
+      case TileType.DISHWASHER: return '洗碗池';
       case TileType.SERVING: return '出餐口';
       case TileType.INGREDIENT: return '食材';
       default: return '未知';
@@ -606,6 +812,9 @@ export class MainScene extends Phaser.Scene {
     // 重置物品管理器
     this.itemManager = new ItemManager(this);
 
+    // 第四阶段：重置盘子管理器
+    this.plateManager.reset();
+
     // 重新渲染地图和初始物品
     this.mapManager.renderMap();
     this.createInitialPlates();
@@ -724,6 +933,53 @@ export class MainScene extends Phaser.Scene {
     }
   }
 
+  // 第四阶段：更新洗碗池进度条UI
+  private updateDishwasherUI(): void {
+    // 查找正在清洗的盘子
+    const washingPlates = this.plateManager.getWashingPlates();
+    
+    if (washingPlates.length > 0 && !this.dishwasherProgressUI) {
+      // 创建进度条UI
+      const dishwasherPos = this.mapManager.gridToWorld(18, 1);
+      this.dishwasherProgressUI = this.add.container(dishwasherPos.x, dishwasherPos.y - 30);
+      
+      // 背景条
+      const bgBar = this.add.rectangle(0, 0, 60, 8, 0x7f8c8d);
+      this.dishwasherProgressUI.add(bgBar);
+      
+      // 进度条（紫色）
+      const progressBar = this.add.rectangle(-30, 0, 0, 6, 0x8e44ad);
+      progressBar.setOrigin(0, 0.5);
+      this.dishwasherProgressUI.add(progressBar);
+      
+      // 标签
+      const label = this.add.text(0, -15, '洗碗中...', {
+        fontSize: '10px',
+        color: '#2c3e50'
+      }).setOrigin(0.5);
+      this.dishwasherProgressUI.add(label);
+    }
+    
+    if (this.dishwasherProgressUI && washingPlates.length > 0) {
+      // 更新进度条
+      const plate = washingPlates[0];
+      const progress = plate.washProgress || 0;
+      const progressBar = this.dishwasherProgressUI.list[1] as Phaser.GameObjects.Rectangle;
+      progressBar.width = 60 * progress;
+      
+      // 更新标签
+      const label = this.dishwasherProgressUI.list[2] as Phaser.GameObjects.Text;
+      const remainingTime = Math.ceil((1 - progress) * 3);
+      label.setText(`洗碗中... ${remainingTime}s`);
+    }
+    
+    if (this.dishwasherProgressUI && washingPlates.length === 0) {
+      // 销毁进度条UI
+      this.dishwasherProgressUI.destroy();
+      this.dishwasherProgressUI = null;
+    }
+  }
+
   // 更新分数（供OrderManager调用）
   updateScore(points: number): void {
     this.score += points;
@@ -756,7 +1012,7 @@ export class MainScene extends Phaser.Scene {
         if (possibleDish) {
           itemInfo += `<br><span style="color: #27ae60; font-size: 11px;">✅ 可制作: ${possibleDish}</span>`;
         } else {
-          itemInfo += `<br><span style="color: #f39c12; font-size: 11px;">⚠️ 食材组合不完整</span>`;
+          itemInfo += `<br><span style="color: #95a5a6; font-size: 11px;">💡 可继续添加食材</span>`;
         }
       } else {
         itemInfo += `<br><span style="color: #95a5a6; font-size: 11px;">空盘子</span>`;

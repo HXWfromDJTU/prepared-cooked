@@ -24,7 +24,8 @@ export enum TileType {
   MICROWAVE = 'microwave',   // 微波炉
   SINK = 'sink',            // 洗碗池
   SERVING = 'serving',      // 出餐口
-  INGREDIENT = 'ingredient'  // 食材存储格
+  INGREDIENT = 'ingredient', // 食材存储格
+  DISHWASHER = 'dishwasher'  // 洗碗池（第四阶段新增）
 }
 
 // 食材类型定义（根据requirement.md中的菜品）
@@ -63,7 +64,8 @@ export interface GridTile {
 export enum ItemType {
   INGREDIENT = 'ingredient',  // 食材
   PLATE = 'plate',           // 碟子
-  DISH = 'dish'              // 完成的菜品（食材+碟子）
+  DISH = 'dish',             // 完成的菜品（食材+碟子）
+  DIRTY_PLATE = 'dirty_plate' // 脏盘子（第四阶段新增）
 }
 
 // 物品状态定义
@@ -71,7 +73,9 @@ export enum ItemState {
   FROZEN = 'frozen',          // 冷冻状态
   THAWING = 'thawing',        // 解冻中
   THAWED = 'thawed',          // 已解冻
-  READY = 'ready'             // 准备就绪（碟子等）
+  READY = 'ready',            // 准备就绪（碟子等）
+  DIRTY = 'dirty',            // 脏的状态（脏盘子）
+  WASHING = 'washing'         // 清洗中（第四阶段新增）
 }
 
 // 物品位置定义
@@ -79,6 +83,8 @@ export enum ItemLocation {
   PLAYER_HAND = 'player_hand',    // 玩家手中
   ON_DESK = 'on_desk',           // 在桌面上
   IN_MICROWAVE = 'in_microwave',  // 在微波炉中
+  IN_DISHWASHER = 'in_dishwasher', // 在洗碗池中（第四阶段新增）
+  AT_SERVING = 'at_serving',      // 在出餐口（脏盘子）
   NOWHERE = 'nowhere'            // 无位置（已被消耗）
 }
 
@@ -92,6 +98,8 @@ export interface Item {
   gridPosition?: Position;      // 如果在格子上，记录格子坐标
   thawProgress?: number;        // 解冻进度 (0-1)
   thawStartTime?: number;       // 解冻开始时间
+  washProgress?: number;        // 洗碗进度 (0-1) - 第四阶段新增
+  washStartTime?: number;       // 洗碗开始时间 - 第四阶段新增
   items?: Item[];              // 如果是组合物品（如碟子+食材）
   dishType?: DishType;         // 如果是菜品，指定菜品类型
 }

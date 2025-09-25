@@ -45,6 +45,10 @@ export class InputManager {
     return Phaser.Input.Keyboard.JustDown(this.spaceKey);
   }
 
+  public isInteractHeld(): boolean {
+    return this.spaceKey.isDown;
+  }
+
   public isRestartPressed(): boolean {
     return Phaser.Input.Keyboard.JustDown(this.rKey);
   }

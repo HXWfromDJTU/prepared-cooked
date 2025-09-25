@@ -49,13 +49,18 @@ export class MapManager {
     this.setTile(3, 3, TileType.DESK, false, true);
     this.setTile(4, 3, TileType.DESK, false, true);
     
-    // 右上桌面区域 (3x2)
+    // 右上桌面区域 (3x2) - 重新设计以配合洗碗池
     this.setTile(15, 2, TileType.DESK, false, true);
     this.setTile(16, 2, TileType.DESK, false, true);
-    this.setTile(17, 2, TileType.DESK, false, true);
+    this.setTile(17, 2, TileType.DESK, false, true); // 洗碗池左下方桌面
     this.setTile(15, 3, TileType.DESK, false, true);
     this.setTile(16, 3, TileType.DESK, false, true);
     this.setTile(17, 3, TileType.DESK, false, true);
+    
+    // 洗碗池专用桌面区域 - 确保洗碗池附近有足够的桌面
+    this.setTile(17, 1, TileType.DESK, false, true); // 洗碗池左边
+    this.setTile(19, 1, TileType.DESK, false, true); // 洗碗池右边
+    this.setTile(18, 2, TileType.DESK, false, true); // 洗碗池下面
     
     // 左下桌面区域 (3x2)
     this.setTile(2, 11, TileType.DESK, false, true);
@@ -87,8 +92,8 @@ export class MapManager {
     // 微波炉 (左上角，底部和右侧有地面可以接近)
     this.setTile(1, 1, TileType.MICROWAVE, false, false);
     
-    // 洗碗池 (右上角，底部和左侧有地面可以接近)
-    this.setTile(18, 1, TileType.SINK, false, false);
+    // 第四阶段：洗碗池 (右上角，紫色矩形，底部和左侧有地面可以接近)
+    this.setTile(18, 1, TileType.DISHWASHER, false, false);
     
     // 出餐口 (右下角，顶部和左侧有地面可以接近)
     this.setTile(18, 13, TileType.SERVING, false, false);
@@ -98,42 +103,31 @@ export class MapManager {
     // 食材存储格是障碍物！厨师不能踩上去，但可以从旁边获取食材
     // 设计原则：每个食材格周围至少有一面是地面，确保可以获取
     
-    // 第一行：基础食材
-    this.setIngredientTile(5, 1, IngredientType.HUANG_MI_GAOOU);    // 黄米糕坯
-    this.setIngredientTile(7, 1, IngredientType.MANTOU);            // 小馒头
-    this.setIngredientTile(9, 1, IngredientType.XIBEI_MIANJIN);     // 西贝面筋
-    this.setIngredientTile(11, 1, IngredientType.FANQIE_NIUROU);    // 番茄牛腩
-    this.setIngredientTile(13, 1, IngredientType.RICE);             // 米饭
-    this.setIngredientTile(15, 1, IngredientType.SOUP_PACK);        // 汤包
+    // 左侧食材区域
+    this.setTile(0, 5, TileType.INGREDIENT, false, false, IngredientType.HUANG_MI_GAOOU);
+    this.setTile(0, 6, TileType.INGREDIENT, false, false, IngredientType.MANTOU);
+    this.setTile(0, 7, TileType.INGREDIENT, false, false, IngredientType.XIBEI_MIANJIN);
+    this.setTile(0, 8, TileType.INGREDIENT, false, false, IngredientType.FANQIE_NIUROU);
+    this.setTile(0, 9, TileType.INGREDIENT, false, false, IngredientType.RICE);
     
-    // 第二行：辅助食材
-    this.setIngredientTile(5, 13, IngredientType.MANGYUE_SAUCE);    // 蔓越莓酱
-    this.setIngredientTile(7, 13, IngredientType.SEASONING_SAUCE);  // 调味汁
-    this.setIngredientTile(9, 13, IngredientType.NOODLES);          // 挂面
-    this.setIngredientTile(11, 13, IngredientType.TOPPINGS);        // 浇头
-    this.setIngredientTile(13, 13, IngredientType.SIDE_DISHES);     // 小菜
-    this.setIngredientTile(15, 13, IngredientType.GREEN_VEG);       // 青菜
-    
-    // 第三行：主要肉类
-    this.setIngredientTile(1, 7, IngredientType.BEEF_BONE);         // 牛大骨
-    this.setIngredientTile(3, 7, IngredientType.YOUMIAN_YUYU);      // 莜面鱼鱼
-    this.setIngredientTile(17, 7, IngredientType.BRAISED_CHICKEN);  // 黄焖鸡
+    // 右侧食材区域
+    this.setTile(19, 5, TileType.INGREDIENT, false, false, IngredientType.MANGYUE_SAUCE);
+    this.setTile(19, 6, TileType.INGREDIENT, false, false, IngredientType.SEASONING_SAUCE);
+    this.setTile(19, 7, TileType.INGREDIENT, false, false, IngredientType.SOUP_PACK);
+    this.setTile(19, 8, TileType.INGREDIENT, false, false, IngredientType.NOODLES);
+    this.setTile(19, 9, TileType.INGREDIENT, false, false, IngredientType.TOPPINGS);
   }
 
-  private setTile(x: number, y: number, type: TileType, isWalkable: boolean, canPlaceItems: boolean): void {
+  private setTile(x: number, y: number, type: TileType, isWalkable: boolean, canPlaceItems: boolean, ingredientType?: IngredientType): void {
     if (x >= 0 && x < this.gridWidth && y >= 0 && y < this.gridHeight) {
-      this.tiles[x][y].type = type;
-      this.tiles[x][y].isWalkable = isWalkable;
-      this.tiles[x][y].canPlaceItems = canPlaceItems;
-    }
-  }
-
-  private setIngredientTile(x: number, y: number, ingredientType: IngredientType): void {
-    if (x >= 0 && x < this.gridWidth && y >= 0 && y < this.gridHeight) {
-      this.tiles[x][y].type = TileType.INGREDIENT;
-      this.tiles[x][y].isWalkable = false;
-      this.tiles[x][y].canPlaceItems = false;
-      this.tiles[x][y].ingredientType = ingredientType;
+      this.tiles[x][y] = {
+        x,
+        y,
+        type,
+        isWalkable,
+        canPlaceItems,
+        ingredientType
+      };
     }
   }
 
@@ -157,8 +151,8 @@ export class MapManager {
           case TileType.MICROWAVE:
             color = 0x3498db; // 蓝色微波炉
             break;
-          case TileType.SINK:
-            color = 0x1abc9c; // 青色洗碗池
+          case TileType.DISHWASHER:
+            color = 0x8e44ad; // 紫色洗碗池（第四阶段要求）
             break;
           case TileType.SERVING:
             color = 0xf39c12; // 橙色出餐口
@@ -180,7 +174,7 @@ export class MapManager {
             case TileType.MICROWAVE:
               label = '微波';
               break;
-            case TileType.SINK:
+            case TileType.DISHWASHER:
               label = '洗碗';
               break;
             case TileType.SERVING:
@@ -199,8 +193,80 @@ export class MapManager {
             }).setOrigin(0.5);
           }
         }
+
+        // 渲染桌面上的物品
+        if (tile.item && tile.type === TileType.DESK) {
+          this.renderItemOnTile(tile.item, pixelX, pixelY);
+        }
       }
     }
+  }
+
+  // 渲染桌面上的物品
+  private renderItemOnTile(item: Item, pixelX: number, pixelY: number): void {
+    let itemColor: number;
+    let itemLabel: string;
+
+    switch (item.type) {
+      case 'plate':
+        itemColor = 0xf8f9fa; // 白色盘子
+        itemLabel = '盘';
+        break;
+      case 'ingredient':
+        // 根据食材状态显示不同颜色
+        switch (item.state) {
+          case 'frozen':
+            itemColor = 0x3498db; // 蓝色冷冻
+            break;
+          case 'thawing':
+            itemColor = 0xf39c12; // 橙色解冻中
+            break;
+          case 'thawed':
+            itemColor = 0x27ae60; // 绿色已解冻
+            break;
+          default:
+            itemColor = 0x95a5a6; // 灰色默认
+        }
+        itemLabel = this.getIngredientShortName(item.ingredientType);
+        break;
+      case 'dish':
+        itemColor = 0xe74c3c; // 红色完成菜品
+        itemLabel = '菜';
+        break;
+      case 'dirty_plate':
+        itemColor = 0x8b4513; // 棕色脏盘子
+        itemLabel = '脏';
+        break;
+      default:
+        itemColor = 0x95a5a6;
+        itemLabel = '?';
+    }
+
+    // 绘制物品圆形
+    const itemCircle = this.scene.add.circle(pixelX, pixelY, 12, itemColor);
+    itemCircle.setStrokeStyle(2, 0x2c3e50);
+
+    // 添加物品标签
+    this.scene.add.text(pixelX, pixelY, itemLabel, {
+      fontSize: '10px',
+      color: '#2c3e50',
+      fontStyle: 'bold'
+    }).setOrigin(0.5);
+  }
+
+  // 获取食材简短名称
+  private getIngredientShortName(ingredientType?: any): string {
+    if (!ingredientType) return '?';
+    
+    const shortNames: { [key: string]: string } = {
+      'huang_mi_gaoou': '糕',
+      'mantou': '馒',
+      'xibei_mianjin': '筋',
+      'fanqie_niurou': '牛',
+      'rice': '饭'
+    };
+    
+    return shortNames[ingredientType] || '?';
   }
 
   private getIngredientLabel(ingredientType?: IngredientType): string {
@@ -217,39 +283,22 @@ export class MapManager {
         return '牛腩';
       case IngredientType.RICE:
         return '米饭';
-      // 新增食材标签
       case IngredientType.MANGYUE_SAUCE:
-        return '莓酱';
+        return '蔓越莓';
       case IngredientType.SEASONING_SAUCE:
-        return '调料';
+        return '调味汁';
       case IngredientType.SOUP_PACK:
         return '汤包';
       case IngredientType.NOODLES:
         return '挂面';
       case IngredientType.TOPPINGS:
         return '浇头';
-      case IngredientType.SIDE_DISHES:
-        return '小菜';
-      case IngredientType.BEEF_BONE:
-        return '牛骨';
-      case IngredientType.YOUMIAN_YUYU:
-        return '鱼鱼';
-      case IngredientType.GREEN_VEG:
-        return '青菜';
-      case IngredientType.BRAISED_CHICKEN:
-        return '焖鸡';
       default:
-        return '食材';
+        return '';
     }
   }
 
-  public worldToGrid(worldX: number, worldY: number): Position {
-    return {
-      x: Math.floor(worldX / this.tileSize),
-      y: Math.floor(worldY / this.tileSize)
-    };
-  }
-
+  // 网格坐标转世界坐标
   public gridToWorld(gridX: number, gridY: number): Position {
     return {
       x: gridX * this.tileSize + this.tileSize / 2,
@@ -257,13 +306,15 @@ export class MapManager {
     };
   }
 
-  public isWalkable(gridX: number, gridY: number): boolean {
-    if (gridX < 0 || gridX >= this.gridWidth || gridY < 0 || gridY >= this.gridHeight) {
-      return false;
-    }
-    return this.tiles[gridX][gridY].isWalkable;
+  // 世界坐标转网格坐标
+  public worldToGrid(worldX: number, worldY: number): Position {
+    return {
+      x: Math.floor(worldX / this.tileSize),
+      y: Math.floor(worldY / this.tileSize)
+    };
   }
 
+  // 获取指定位置的格子
   public getTile(gridX: number, gridY: number): GridTile | null {
     if (gridX < 0 || gridX >= this.gridWidth || gridY < 0 || gridY >= this.gridHeight) {
       return null;
@@ -271,24 +322,16 @@ export class MapManager {
     return this.tiles[gridX][gridY];
   }
 
-  public getTileSize(): number {
-    return this.tileSize;
+  // 检查位置是否可行走
+  public isWalkable(gridX: number, gridY: number): boolean {
+    const tile = this.getTile(gridX, gridY);
+    return tile ? tile.isWalkable : false;
   }
 
-  public getGridSize(): { width: number; height: number } {
-    return {
-      width: this.gridWidth,
-      height: this.gridHeight
-    };
-  }
-
-  // 检查格子是否可以放置物品
+  // 检查位置是否可以放置物品
   public canPlaceItem(gridX: number, gridY: number): boolean {
     const tile = this.getTile(gridX, gridY);
-    if (!tile) return false;
-    
-    // 只有桌面可以放置物品，且该格子上没有其他物品
-    return tile.canPlaceItems && !tile.item;
+    return tile ? (tile.canPlaceItems && !tile.item) : false;
   }
 
   // 在格子上放置物品
@@ -346,9 +389,37 @@ export class MapManager {
     return true;
   }
 
-  // 从微波炉中取出物品
+  // 从微波炉中移除物品
   public removeMicrowaveItem(gridX: number, gridY: number): Item | null {
     if (!this.isMicrowave(gridX, gridY)) return null;
+    return this.removeItem(gridX, gridY);
+  }
+
+  // 第四阶段：检查格子是否为洗碗池
+  public isDishwasher(gridX: number, gridY: number): boolean {
+    const tile = this.getTile(gridX, gridY);
+    return tile?.type === TileType.DISHWASHER || false;
+  }
+
+  // 第四阶段：获取洗碗池中的物品
+  public getDishwasherItem(gridX: number, gridY: number): Item | null {
+    if (!this.isDishwasher(gridX, gridY)) return null;
+    return this.getItemAt(gridX, gridY);
+  }
+
+  // 第四阶段：在洗碗池中放置物品
+  public placeDishwasherItem(gridX: number, gridY: number, item: Item): boolean {
+    if (!this.isDishwasher(gridX, gridY)) return false;
+    const tile = this.getTile(gridX, gridY);
+    if (!tile || tile.item) return false; // 洗碗池已有物品
+
+    tile.item = item;
+    return true;
+  }
+
+  // 第四阶段：从洗碗池中移除物品
+  public removeDishwasherItem(gridX: number, gridY: number): Item | null {
+    if (!this.isDishwasher(gridX, gridY)) return null;
     return this.removeItem(gridX, gridY);
   }
 }
