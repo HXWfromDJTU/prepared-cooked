@@ -43,6 +43,45 @@ export class PlateManager {
     });
   }
 
+  // 在出餐口生成脏盘子（按验收标准要求）
+  public addDirtyPlateToServingArea(): void {
+    const mapManager = (this.scene as any).mapManager;
+    if (!mapManager) return;
+
+    // 出餐口附近的桌面位置
+    const servingAreaPositions = [
+      { x: 17, y: 13 }, // 出餐口左边
+      { x: 19, y: 13 }, // 出餐口右边
+      { x: 18, y: 12 }, // 出餐口上面
+      { x: 17, y: 12 }, // 出餐口左上
+      { x: 19, y: 12 }, // 出餐口右上
+    ];
+
+    // 找到第一个可用位置放置脏盘子
+    for (const pos of servingAreaPositions) {
+      if (mapManager.canPlaceItem(pos.x, pos.y)) {
+        const dirtyPlate: Item = {
+          id: `dirty_plate_${this.plateIdCounter++}`,
+          type: ItemType.DIRTY_PLATE,
+          state: ItemState.READY,
+          location: ItemLocation.ON_DESK,
+          gridPosition: pos
+        };
+
+        mapManager.placeItem(pos.x, pos.y, dirtyPlate);
+
+        // 安全更新物品显示
+        mapManager.safeUpdateItemDisplay(pos.x, pos.y);
+
+        console.log(`脏盘子出现在出餐口附近 (${pos.x}, ${pos.y})`);
+        return;
+      }
+    }
+
+    console.log('出餐口附近没有空位放置脏盘子，改为放入洗碗池');
+    this.addDirtyPlateToSink();
+  }
+
   // 在洗碗池中添加脏盘子（自动生成）
   public addDirtyPlateToSink(): void {
     const mapManager = (this.scene as any).mapManager;
@@ -67,6 +106,9 @@ export class PlateManager {
     
     // 将脏盘子放入洗碗池
     mapManager.placeDishwasherItem(18, 1, dirtyPlate);
+
+    // 安全更新洗碗池显示
+    mapManager.safeUpdateItemDisplay(18, 1);
   }
 
   // 持续洗碗流程（玩家需要持续按住操作键）
@@ -127,18 +169,24 @@ export class PlateManager {
         console.log(`盘子 ${plateId} 洗碗进度: ${Math.floor(plate.washProgress * 100)}%`);
         
         // 洗碗完成
-        if (plate.washProgress >= 1) {
+        if (plate.washProgress >= 1 && !plate.washCompleted) {
           console.log(`🎉 盘子 ${plateId} 洗碗完成！开始处理...`);
-          
+
+          // 标记为已完成，防止重复处理
+          plate.washCompleted = true;
+
           // 从洗碗池移除
           console.log('步骤1: 从洗碗池移除脏盘子...');
           const removed = mapManager?.removeDishwasherItem(18, 1);
           console.log(`洗碗池移除结果: ${removed ? '成功' : '失败'}`);
-          
+
+          // 更新洗碗池显示
+          mapManager.safeUpdateItemDisplay(18, 1);
+
           // 在洗碗池附近的桌面生成干净盘子
           console.log('步骤2: 生成干净盘子...');
           this.spawnCleanPlateNearSink();
-          
+
           // 从正在清洗列表中移除
           console.log('步骤3: 从清洗列表移除...');
           this.washingPlates.delete(plateId);
@@ -193,6 +241,13 @@ export class PlateManager {
           location: ItemLocation.ON_DESK,
           gridPosition: pos
         };
+
+        console.log('🧽 创建干净盘子详情:', {
+          id: cleanPlate.id,
+          type: cleanPlate.type,
+          state: cleanPlate.state,
+          location: cleanPlate.location
+        });
         
         const success = mapManager.placeItem(pos.x, pos.y, cleanPlate);
         console.log(`✅ 干净盘子放置结果: ${success ? '成功' : '失败'} 在位置 (${pos.x}, ${pos.y})`);
@@ -201,9 +256,8 @@ export class PlateManager {
         const verifyItem = mapManager.getItemAt(pos.x, pos.y);
         console.log(`🔍 验证: 位置 (${pos.x}, ${pos.y}) 的物品: ${verifyItem ? verifyItem.type : '无'}`);
         
-        // 强制重新渲染地图以显示新物品
-        console.log('🔄 强制重新渲染地图...');
-        mapManager.renderMap();
+        // 安全更新物品显示
+        mapManager.safeUpdateItemDisplay(pos.x, pos.y);
         
         return;
       } else {

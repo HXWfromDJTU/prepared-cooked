@@ -1,4 +1,4 @@
-import { GridTile, TileType, Position, IngredientType, Item } from '../types';
+import { GridTile, TileType, Position, IngredientType, Item, ItemType, ItemState } from '../types';
 
 export class MapManager {
   private gridWidth: number = 20;   // 网格宽度（格子数量）
@@ -6,6 +6,7 @@ export class MapManager {
   private tileSize: number = 40;    // 每个格子的像素大小
   private tiles: GridTile[][] = [];
   private scene: Phaser.Scene;
+  private itemSprites: Map<string, Phaser.GameObjects.Container> = new Map(); // 管理物品精灵
 
   constructor(scene: Phaser.Scene) {
     this.scene = scene;
@@ -194,8 +195,8 @@ export class MapManager {
           }
         }
 
-        // 渲染桌面上的物品
-        if (tile.item && tile.type === TileType.DESK) {
+        // 渲染桌面和洗碗池中的物品
+        if (tile.item && (tile.type === TileType.DESK || tile.type === TileType.DISHWASHER)) {
           this.renderItemOnTile(tile.item, pixelX, pixelY);
         }
       }
@@ -421,5 +422,107 @@ export class MapManager {
   public removeDishwasherItem(gridX: number, gridY: number): Item | null {
     if (!this.isDishwasher(gridX, gridY)) return null;
     return this.removeItem(gridX, gridY);
+  }
+
+  // 安全的物品精灵管理
+  private createItemSprite(item: Item, x: number, y: number): Phaser.GameObjects.Container {
+    const container = this.scene.add.container(x, y);
+
+    console.log('🎨 渲染物品精灵:', {
+      type: item.type,
+      state: item.state,
+      id: item.id,
+      position: `(${Math.round(x/40)}, ${Math.round(y/40)})`
+    });
+
+    let color: number;
+    let size: number = 20;
+
+    switch (item.type) {
+      case ItemType.PLATE:
+        color = 0xf8f9fa; // 白色盘子
+        break;
+      case ItemType.DIRTY_PLATE:
+        color = 0x8b4513; // 棕色脏盘子
+        break;
+      case ItemType.INGREDIENT:
+        switch (item.state) {
+          case ItemState.FROZEN: color = 0x3498db; break;  // 蓝色冷冻
+          case ItemState.THAWING: color = 0xf39c12; break; // 橙色解冻中
+          case ItemState.THAWED: color = 0xe74c3c; break;  // 红色已解冻
+          default: color = 0x95a5a6; break;
+        }
+        break;
+      case ItemType.DISH:
+        color = 0x27ae60; // 绿色完成菜品
+        size = 25;
+        break;
+      default:
+        color = 0x95a5a6;
+    }
+
+    const circle = this.scene.add.circle(0, 0, size/2, color);
+    circle.setStrokeStyle(2, 0x2c3e50);
+    container.add(circle);
+
+    // 添加简单标识
+    const text = this.scene.add.text(0, 0, this.getItemLabel(item), {
+      fontSize: '8px',
+      color: '#2c3e50'
+    }).setOrigin(0.5);
+    container.add(text);
+
+    return container;
+  }
+
+  private getItemLabel(item: Item): string {
+    switch (item.type) {
+      case ItemType.PLATE: return '盘';
+      case ItemType.DIRTY_PLATE: return '脏';
+      case ItemType.INGREDIENT: return '材';
+      case ItemType.DISH: return '菜';
+      default: return '?';
+    }
+  }
+
+  // 安全更新物品显示
+  public safeUpdateItemDisplay(gridX: number, gridY: number): void {
+    const posKey = `${gridX}-${gridY}`;
+    const item = this.getItemAt(gridX, gridY);
+
+    // 清除旧的精灵
+    if (this.itemSprites.has(posKey)) {
+      this.itemSprites.get(posKey)?.destroy();
+      this.itemSprites.delete(posKey);
+    }
+
+    // 如果有新物品，创建精灵
+    if (item) {
+      const worldPos = this.gridToWorld(gridX, gridY);
+      const sprite = this.createItemSprite(item, worldPos.x, worldPos.y);
+      this.itemSprites.set(posKey, sprite);
+    }
+  }
+
+  // 清除所有物品精灵（保留地图和玩家）
+  public clearAllItemSprites(): void {
+    this.itemSprites.forEach(sprite => sprite.destroy());
+    this.itemSprites.clear();
+  }
+
+  // 安全的完整物品渲染
+  public safeRenderAllItems(): void {
+    // 先清除所有旧的物品精灵
+    this.clearAllItemSprites();
+
+    // 重新渲染所有物品
+    for (let x = 0; x < this.gridWidth; x++) {
+      for (let y = 0; y < this.gridHeight; y++) {
+        const tile = this.tiles[x][y];
+        if (tile.item && (tile.type === TileType.DESK || tile.type === TileType.DISHWASHER)) {
+          this.safeUpdateItemDisplay(x, y);
+        }
+      }
+    }
   }
 }

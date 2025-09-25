@@ -54,6 +54,9 @@ export class MainScene extends Phaser.Scene {
     
     // 渲染地图
     this.mapManager.renderMap();
+
+    // 安全渲染所有初始物品
+    this.mapManager.safeRenderAllItems();
     
     // 初始化桌面盘子
     this.plateManager.initializePlatesOnTables();
@@ -198,12 +201,20 @@ export class MainScene extends Phaser.Scene {
       const droppedItem = this.player.dropItem()!;
       this.itemManager.moveItem(droppedItem.id, ItemLocation.ON_DESK, deskGrid);
       this.mapManager.placeItem(deskGrid.x, deskGrid.y, droppedItem);
+
+      // 安全更新物品显示
+      this.mapManager.safeUpdateItemDisplay(deskGrid.x, deskGrid.y);
+
       this.showInteractionFeedback(`放置：${this.getItemName(droppedItem)}`, deskGrid);
     } else if (!heldItem && deskItem) {
       // 玩家手里没物品，桌面有物品 - 拾取物品
       this.player.pickUpItem(deskItem);
       this.itemManager.moveItem(deskItem.id, ItemLocation.PLAYER_HAND);
       this.mapManager.removeItem(deskGrid.x, deskGrid.y);
+
+      // 安全更新物品显示（移除物品）
+      this.mapManager.safeUpdateItemDisplay(deskGrid.x, deskGrid.y);
+
       this.showInteractionFeedback(`拾取：${this.getItemName(deskItem)}`, deskGrid);
     } else if (heldItem && deskItem) {
       // 第四阶段：检查是否需要盘子进行装盘
@@ -288,7 +299,7 @@ export class MainScene extends Phaser.Scene {
   // 处理上菜交互
   private handleServingInteraction(): void {
     const heldItem = this.player.getHeldItem();
-    
+
     if (!heldItem) {
       this.showInteractionFeedback('手里没有物品可以上菜', { x: 18, y: 13 });
       return;
@@ -296,25 +307,45 @@ export class MainScene extends Phaser.Scene {
 
     // 上菜任何物品，出餐口"吞掉"物品
     const itemToServe = this.player.dropItem()!;
+
+    console.log('🍽️ 上菜调试信息:');
+    console.log('- 物品类型:', itemToServe.type);
+    console.log('- 物品状态:', itemToServe);
+    console.log('- 是否包含盘子:', this.itemContainsPlate(itemToServe));
     
+    // 先检查是否包含盘子，决定是否生成脏盘子
+    const containsPlate = this.itemContainsPlate(itemToServe);
+    console.log('🧽 脏盘子生成检查：物品包含盘子 =', containsPlate);
+
     // 检查是否为完成的菜品且匹配订单
-    if (heldItem.type === ItemType.DISH && heldItem.dishType && 
+    if (heldItem.type === ItemType.DISH && heldItem.dishType &&
         this.orderManager.hasMatchingOrder(heldItem.dishType)) {
       // 上菜成功
       const orderCompleted = this.orderManager.completeOrder(heldItem.dishType);
       if (orderCompleted) {
         this.showServeResult('✅ 订单完成！', true);
-        // 20秒后生成脏盘子到洗碗池
-        this.scheduleDelayedDirtyPlate(20000);
+
+        // 成功上菜后，如果包含盘子就生成脏盘子到出餐口附近
+        if (containsPlate) {
+          console.log('✅ 订单完成！菜品包含盘子，5秒后生成脏盘子到出餐口');
+          this.scheduleDelayedDirtyPlateToServing(5000);
+        } else {
+          console.log('✅ 订单完成！但菜品不包含盘子，不生成脏盘子');
+        }
+      } else {
+        console.log('❌ 订单完成失败');
       }
     } else {
       // 上错菜，扣分
       this.updateScore(-50); // 扣除50分
       this.showServeResult('❌ 上错菜！(-50分)', false);
-      
-      // 如果上错的菜品包含盘子，3秒后生成脏盘子到洗碗池
-      if (this.itemContainsPlate(itemToServe)) {
+
+      // 上错菜后，如果包含盘子就生成脏盘子到洗碗池
+      if (containsPlate) {
+        console.log('✅ 上错菜包含盘子，3秒后生成脏盘子到洗碗池');
         this.scheduleDelayedDirtyPlate(3000);
+      } else {
+        console.log('❌ 上错菜不包含盘子，不生成脏盘子');
       }
     }
     
@@ -425,16 +456,40 @@ export class MainScene extends Phaser.Scene {
 
   // 检查物品是否包含盘子
   private itemContainsPlate(item: any): boolean {
+    console.log('🔍 检查物品是否包含盘子:', {
+      type: item.type,
+      hasItems: !!(item.items && Array.isArray(item.items)),
+      itemsLength: item.items ? item.items.length : 0
+    });
+
     // 如果是盘子本身
-    if (item.type === ItemType.PLATE) return true;
-    
+    if (item.type === ItemType.PLATE) {
+      console.log('→ 是盘子本身，包含盘子');
+      return true;
+    }
+
     // 如果是菜品（菜品通常是用盘子装的）
-    if (item.type === ItemType.DISH) return true;
-    
+    if (item.type === ItemType.DISH) {
+      console.log('→ 是完成的菜品，包含盘子');
+      return true;
+    }
+
     // 如果是有items数组的盘子（装了食材的盘子）
-    if (item.items && Array.isArray(item.items)) return true;
-    
+    if (item.items && Array.isArray(item.items)) {
+      console.log('→ 有items数组，包含盘子');
+      return true;
+    }
+
+    console.log('→ 不包含盘子');
     return false;
+  }
+
+  // 延迟生成脏盘子到出餐口附近
+  private scheduleDelayedDirtyPlateToServing(delay: number): void {
+    this.time.delayedCall(delay, () => {
+      this.plateManager.addDirtyPlateToServingArea();
+      console.log(`${delay/1000}秒后，脏盘子出现在出餐口附近`);
+    });
   }
 
   // 延迟生成脏盘子到洗碗池
@@ -819,6 +874,9 @@ export class MainScene extends Phaser.Scene {
     this.mapManager.renderMap();
     this.createInitialPlates();
     this.createInitialPreparedFood();
+
+    // 安全渲染所有物品
+    this.mapManager.safeRenderAllItems();
 
     // 重置玩家位置
     this.player.resetToGridPosition(7, 7);
