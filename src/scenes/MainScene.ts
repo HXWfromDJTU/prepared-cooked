@@ -1,13 +1,15 @@
 import { InputManager } from '../managers/InputManager';
 import { MapManager } from '../managers/MapManager';
 import { ItemManager } from '../managers/ItemManager';
+import { OrderManager } from '../managers/OrderManager';
 import { Player } from '../entities/Player';
-import { TileType, IngredientType, ItemType, ItemLocation } from '../types';
+import { TileType, IngredientType, ItemType, ItemLocation, DishType } from '../types';
 
 export class MainScene extends Phaser.Scene {
   private inputManager!: InputManager;
   private mapManager!: MapManager;
   private itemManager!: ItemManager;
+  private orderManager!: OrderManager;
   private player!: Player;
   private gameWidth: number = 800;
   private gameHeight: number = 600;
@@ -33,6 +35,9 @@ export class MainScene extends Phaser.Scene {
     
     // 创建物品管理器
     this.itemManager = new ItemManager(this);
+    
+    // 创建订单管理器
+    this.orderManager = new OrderManager(this);
     
     // 渲染地图
     this.mapManager.renderMap();
@@ -62,6 +67,9 @@ export class MainScene extends Phaser.Scene {
     
     // 更新物品系统（解冻进度等）
     this.itemManager.updateThawing();
+    
+    // 更新订单系统
+    this.orderManager.update(currentTime);
     
     // 更新微波炉进度条UI
     this.updateMicrowaveUI();
@@ -160,17 +168,30 @@ export class MainScene extends Phaser.Scene {
       this.mapManager.removeItem(deskGrid.x, deskGrid.y);
       this.showInteractionFeedback(`拾取：${this.getItemName(deskItem)}`, deskGrid);
     } else if (heldItem && deskItem) {
-      // 尝试组合物品（碟子+解冻食材）
+      // 尝试将食材添加到盘子上
       if (this.itemManager.canCombineItems(heldItem.id, deskItem.id)) {
         const plateId = heldItem.type === ItemType.PLATE ? heldItem.id : deskItem.id;
         const ingredientId = heldItem.type === ItemType.INGREDIENT ? heldItem.id : deskItem.id;
+        const ingredient = this.itemManager.getItem(ingredientId);
         
-        const dish = this.itemManager.createDish(plateId, ingredientId);
-        if (dish) {
+        // 使用新的渐进式组合方法
+        if (this.itemManager.addIngredientToPlate(plateId, ingredientId)) {
+          const plate = this.itemManager.getItem(plateId);
+          
+          // 更新玩家手持物品
           this.player.dropItem();
-          this.player.pickUpItem(dish);
+          this.player.pickUpItem(plate!);
           this.mapManager.removeItem(deskGrid.x, deskGrid.y);
-          this.showInteractionFeedback(`组装完成：${this.getItemName(dish)}`, deskGrid);
+          
+          // 根据盘子状态显示反馈
+          if (plate?.type === ItemType.DISH) {
+            this.showInteractionFeedback(`菜品完成：${this.getItemName(plate)}`, deskGrid);
+          } else {
+            const ingredientName = this.getIngredientName(ingredient?.ingredientType);
+            this.showInteractionFeedback(`食材已添加：${ingredientName}`, deskGrid);
+          }
+        } else {
+          this.showInteractionFeedback('无法添加食材', deskGrid);
         }
       } else {
         this.showInteractionFeedback('无法组合这些物品', deskGrid);
@@ -189,14 +210,30 @@ export class MainScene extends Phaser.Scene {
       return;
     }
 
-    // 玩家放下手里的物品并尝试上菜
+    // 检查是否为完成的菜品
+    if (heldItem.type !== ItemType.DISH || !heldItem.dishType) {
+      this.showInteractionFeedback('只能上菜完成的菜品', { x: 18, y: 13 });
+      return;
+    }
+
+    // 检查是否有匹配的订单
+    if (!this.orderManager.hasMatchingOrder(heldItem.dishType)) {
+      this.showInteractionFeedback('没有对应的订单', { x: 18, y: 13 });
+      return;
+    }
+
+    // 上菜成功，完成订单
     const itemToServe = this.player.dropItem()!;
-    const result = this.itemManager.serveItem(itemToServe.id);
+    const orderCompleted = this.orderManager.completeOrder(heldItem.dishType);
     
-    // 更新分数
-    this.score += result.score;
-    
-    this.showServeResult(result.message, result.success);
+    if (orderCompleted) {
+      // 订单完成，物品已经上菜（从玩家手中移除）
+      this.showServeResult('✅ 订单完成！', true);
+    } else {
+      // 如果由于某种原因订单完成失败，返还物品给玩家
+      this.player.pickUpItem(itemToServe);
+      this.showServeResult('❌ 订单完成失败', false);
+    }
   }
 
   // 处理食材获取交互
@@ -276,7 +313,7 @@ export class MainScene extends Phaser.Scene {
         // 更新手持物品信息
         const heldItemElement = document.getElementById('held-item-info');
         if (heldItemElement) {
-          heldItemElement.textContent = `手持物品: ${heldItem ? this.getItemName(heldItem) : '无'}`;
+          heldItemElement.innerHTML = this.getDetailedHeldItemInfo(heldItem);
         }
       },
       loop: true
@@ -305,17 +342,46 @@ export class MainScene extends Phaser.Scene {
     }
   }
 
-  private getIngredientName(ingredientType?: IngredientType): string {
+  private getIngredientName(ingredientType?: IngredientType | string): string {
     if (!ingredientType) return '未知食材';
     
-    switch (ingredientType) {
-      case IngredientType.HUANG_MI_GAOOU: return '黄米凉糕';
-      case IngredientType.MANTOU: return '小馒头';
-      case IngredientType.XIBEI_MIANJIN: return '西贝面筋';
-      case IngredientType.FANQIE_NIUROU: return '番茄牛腩';
-      case IngredientType.RICE: return '米饭';
-      default: return '未知食材';
-    }
+    // 处理字符串类型的ingredientType
+    const typeKey = typeof ingredientType === 'string' ? ingredientType : ingredientType;
+    
+    const names: { [key: string]: string } = {
+      'HUANG_MI_GAOOU': '黄米糕坯',
+      'huang_mi_gaoou': '黄米糕坯',
+      'MANTOU': '小馒头',
+      'mantou': '小馒头',
+      'XIBEI_MIANJIN': '西贝面筋',
+      'xibei_mianjin': '西贝面筋',
+      'FANQIE_NIUROU': '番茄牛腩',
+      'fanqie_niurou': '番茄牛腩',
+      'RICE': '米饭',
+      'rice': '米饭',
+      'MANGYUE_SAUCE': '蔓越莓酱',
+      'mangyue_sauce': '蔓越莓酱',
+      'SEASONING_SAUCE': '调味汁',
+      'seasoning_sauce': '调味汁',
+      'SOUP_PACK': '汤包',
+      'soup_pack': '汤包',
+      'NOODLES': '挂面',
+      'noodles': '挂面',
+      'TOPPINGS': '浇头',
+      'toppings': '浇头',
+      'SIDE_DISHES': '小菜',
+      'side_dishes': '小菜',
+      'BEEF_BONE': '牛大骨',
+      'beef_bone': '牛大骨',
+      'YOUMIAN_YUYU': '莜面鱼鱼',
+      'youmian_yuyu': '莜面鱼鱼',
+      'GREEN_VEG': '青菜',
+      'green_veg': '青菜',
+      'BRAISED_CHICKEN': '黄焖鸡',
+      'braised_chicken': '黄焖鸡'
+    };
+    
+    return names[typeKey] || '未知食材';
   }
 
   // 获取物品名称
@@ -423,5 +489,115 @@ export class MainScene extends Phaser.Scene {
         this.microwaveProgressUI = null;
       }
     }
+  }
+
+  // 更新分数（供OrderManager调用）
+  updateScore(points: number): void {
+    this.score += points;
+    console.log(`分数变化: ${points > 0 ? '+' : ''}${points} (总分: ${this.score})`);
+  }
+
+  // 获取ItemManager实例（供OrderManager调用）
+  getItemManager(): ItemManager {
+    return this.itemManager;
+  }
+
+
+  // 获取详细的手持物品信息
+  private getDetailedHeldItemInfo(heldItem: any): string {
+    if (!heldItem) {
+      return '手持物品: 无';
+    }
+
+    let itemInfo = `手持物品: ${this.getItemName(heldItem)}`;
+
+    // 如果是盘子，显示盘子上的食材
+    if (heldItem.type === 'plate') {
+      const plateIngredients = this.getPlateIngredients(heldItem);
+      if (plateIngredients.length > 0) {
+        const ingredientNames = plateIngredients.map(ing => this.getIngredientDisplayName(ing));
+        itemInfo += `<br><span style="color: #3498db; font-size: 11px;">盘子上有: ${ingredientNames.join(' + ')}</span>`;
+        
+        // 检查是否可以组成某个菜品
+        const possibleDish = this.checkPossibleDish(plateIngredients);
+        if (possibleDish) {
+          itemInfo += `<br><span style="color: #27ae60; font-size: 11px;">✅ 可制作: ${possibleDish}</span>`;
+        } else {
+          itemInfo += `<br><span style="color: #f39c12; font-size: 11px;">⚠️ 食材组合不完整</span>`;
+        }
+      } else {
+        itemInfo += `<br><span style="color: #95a5a6; font-size: 11px;">空盘子</span>`;
+      }
+    }
+    // 如果是食材，显示食材状态
+    else if (heldItem.type === 'ingredient') {
+      const stateText = this.getIngredientStateText(heldItem.state);
+      const stateColor = heldItem.state === 'thawed' ? '#27ae60' : 
+                        heldItem.state === 'thawing' ? '#f39c12' : '#3498db';
+      itemInfo += `<br><span style="color: ${stateColor}; font-size: 11px;">状态: ${stateText}</span>`;
+      
+      if (heldItem.state === 'thawing' && heldItem.thawProgress !== undefined) {
+        const progress = Math.round(heldItem.thawProgress * 100);
+        itemInfo += `<br><span style="color: #f39c12; font-size: 11px;">解冻进度: ${progress}%</span>`;
+      }
+    }
+    // 如果是完成的菜品
+    else if (heldItem.type === 'dish') {
+      itemInfo += `<br><span style="color: #27ae60; font-size: 11px;">✅ 已完成的菜品</span>`;
+      itemInfo += `<br><span style="color: #e74c3c; font-size: 11px;">🚚 可送到出餐口</span>`;
+    }
+
+    return itemInfo;
+  }
+
+  // 获取盘子上的食材列表
+  private getPlateIngredients(plate: any): any[] {
+    // 根据Item接口，组合物品存储在items字段中
+    if (plate.items && Array.isArray(plate.items)) {
+      return plate.items.filter((item: any) => item.type === 'ingredient');
+    }
+    return [];
+  }
+
+  // 检查食材组合是否能制作某个菜品
+  private checkPossibleDish(ingredients: any[]): string | null {
+    if (ingredients.length === 0) return null;
+    
+    // 获取所有订单的配方
+    const currentOrders = this.orderManager.getCurrentOrders();
+    for (const order of currentOrders) {
+      const recipe = this.orderManager.getRecipeByType(order.dishType);
+      if (recipe && this.ingredientsMatch(ingredients, recipe.ingredients)) {
+        return recipe.name;
+      }
+    }
+    return null;
+  }
+
+  // 检查食材是否匹配配方
+  private ingredientsMatch(plateIngredients: any[], requiredIngredients: any[]): boolean {
+    if (plateIngredients.length !== requiredIngredients.length) return false;
+    
+    const plateTypes = plateIngredients.map(ing => ing.ingredientType || ing).sort();
+    const requiredTypes = requiredIngredients.sort();
+    
+    return JSON.stringify(plateTypes) === JSON.stringify(requiredTypes);
+  }
+
+  // 获取食材显示名称
+  private getIngredientDisplayName(ingredient: any): string {
+    const type = ingredient.ingredientType || ingredient;
+    return this.getIngredientName(type);
+  }
+
+
+  // 获取食材状态文字
+  private getIngredientStateText(state: string): string {
+    const states: { [key: string]: string } = {
+      'frozen': '冷冻',
+      'thawing': '解冻中',
+      'thawed': '已解冻'
+    };
+    return states[state] || state;
   }
 }

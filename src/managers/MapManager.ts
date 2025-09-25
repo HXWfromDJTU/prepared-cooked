@@ -98,12 +98,26 @@ export class MapManager {
     // 食材存储格是障碍物！厨师不能踩上去，但可以从旁边获取食材
     // 设计原则：每个食材格周围至少有一面是地面，确保可以获取
     
-    // 在上方区域放置食材存储格
-    this.setIngredientTile(6, 1, IngredientType.HUANG_MI_GAOOU);    // 黄米凉糕
-    this.setIngredientTile(8, 1, IngredientType.MANTOU);            // 小馒头  
-    this.setIngredientTile(10, 1, IngredientType.XIBEI_MIANJIN);    // 西贝面筋
-    this.setIngredientTile(12, 1, IngredientType.FANQIE_NIUROU);    // 番茄牛腩
-    this.setIngredientTile(14, 1, IngredientType.RICE);             // 米饭
+    // 第一行：基础食材
+    this.setIngredientTile(5, 1, IngredientType.HUANG_MI_GAOOU);    // 黄米糕坯
+    this.setIngredientTile(7, 1, IngredientType.MANTOU);            // 小馒头
+    this.setIngredientTile(9, 1, IngredientType.XIBEI_MIANJIN);     // 西贝面筋
+    this.setIngredientTile(11, 1, IngredientType.FANQIE_NIUROU);    // 番茄牛腩
+    this.setIngredientTile(13, 1, IngredientType.RICE);             // 米饭
+    this.setIngredientTile(15, 1, IngredientType.SOUP_PACK);        // 汤包
+    
+    // 第二行：辅助食材
+    this.setIngredientTile(5, 13, IngredientType.MANGYUE_SAUCE);    // 蔓越莓酱
+    this.setIngredientTile(7, 13, IngredientType.SEASONING_SAUCE);  // 调味汁
+    this.setIngredientTile(9, 13, IngredientType.NOODLES);          // 挂面
+    this.setIngredientTile(11, 13, IngredientType.TOPPINGS);        // 浇头
+    this.setIngredientTile(13, 13, IngredientType.SIDE_DISHES);     // 小菜
+    this.setIngredientTile(15, 13, IngredientType.GREEN_VEG);       // 青菜
+    
+    // 第三行：主要肉类
+    this.setIngredientTile(1, 7, IngredientType.BEEF_BONE);         // 牛大骨
+    this.setIngredientTile(3, 7, IngredientType.YOUMIAN_YUYU);      // 莜面鱼鱼
+    this.setIngredientTile(17, 7, IngredientType.BRAISED_CHICKEN);  // 黄焖鸡
   }
 
   private setTile(x: number, y: number, type: TileType, isWalkable: boolean, canPlaceItems: boolean): void {
@@ -194,7 +208,7 @@ export class MapManager {
     
     switch (ingredientType) {
       case IngredientType.HUANG_MI_GAOOU:
-        return '凉糕';
+        return '糕坯';
       case IngredientType.MANTOU:
         return '馒头';
       case IngredientType.XIBEI_MIANJIN:
@@ -203,6 +217,27 @@ export class MapManager {
         return '牛腩';
       case IngredientType.RICE:
         return '米饭';
+      // 新增食材标签
+      case IngredientType.MANGYUE_SAUCE:
+        return '莓酱';
+      case IngredientType.SEASONING_SAUCE:
+        return '调料';
+      case IngredientType.SOUP_PACK:
+        return '汤包';
+      case IngredientType.NOODLES:
+        return '挂面';
+      case IngredientType.TOPPINGS:
+        return '浇头';
+      case IngredientType.SIDE_DISHES:
+        return '小菜';
+      case IngredientType.BEEF_BONE:
+        return '牛骨';
+      case IngredientType.YOUMIAN_YUYU:
+        return '鱼鱼';
+      case IngredientType.GREEN_VEG:
+        return '青菜';
+      case IngredientType.BRAISED_CHICKEN:
+        return '焖鸡';
       default:
         return '食材';
     }
