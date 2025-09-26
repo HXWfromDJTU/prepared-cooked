@@ -1,82 +1,12 @@
 import { MainScene } from '../scenes/MainScene';
-import { 
-  Order, 
-  OrderStatus, 
-  DishType, 
-  DishRecipe, 
-  IngredientType 
+import {
+  Order,
+  OrderStatus,
+  DishType,
+  DishRecipe,
+  IngredientType
 } from '../types';
-
-// 菜品配方数据
-const DISH_RECIPES: DishRecipe[] = [
-  // 简单菜品 (复杂度1-2)
-  {
-    dishType: DishType.HUANG_MI_LIANGGAO,
-    name: '黄米凉糕',
-    ingredients: [IngredientType.HUANG_MI_GAOOU, IngredientType.MANGYUE_SAUCE],
-    complexity: 1,
-    baseTime: 45,
-    difficulty: 'simple'
-  },
-  {
-    dishType: DishType.XIAO_MANTOU,
-    name: '小馒头',
-    ingredients: [IngredientType.MANTOU],
-    complexity: 1,
-    baseTime: 30,
-    difficulty: 'simple'
-  },
-  {
-    dishType: DishType.XIBEI_MIANJIN_DISH,
-    name: '西贝面筋',
-    ingredients: [IngredientType.XIBEI_MIANJIN, IngredientType.SEASONING_SAUCE],
-    complexity: 2,
-    baseTime: 50,
-    difficulty: 'simple'
-  },
-  {
-    dishType: DishType.FANQIE_NIUROU_FAN,
-    name: '番茄牛腩饭',
-    ingredients: [IngredientType.FANQIE_NIUROU, IngredientType.RICE],
-    complexity: 2,
-    baseTime: 55,
-    difficulty: 'simple'
-  },
-  {
-    dishType: DishType.ZICAI_DANHUA_TANG,
-    name: '紫菜蛋花汤',
-    ingredients: [IngredientType.SOUP_PACK],
-    complexity: 1,
-    baseTime: 35,
-    difficulty: 'simple'
-  },
-  
-  // 中等菜品 (复杂度3)
-  {
-    dishType: DishType.ZHANGYE_KONGXIN_GUAMIAN,
-    name: '张爷爷空心挂面',
-    ingredients: [IngredientType.NOODLES, IngredientType.TOPPINGS, IngredientType.SIDE_DISHES],
-    complexity: 3,
-    baseTime: 75,
-    difficulty: 'medium'
-  },
-  {
-    dishType: DishType.NIUDAGU_TAOCAN,
-    name: '牛大骨套餐',
-    ingredients: [IngredientType.BEEF_BONE, IngredientType.YOUMIAN_YUYU, IngredientType.GREEN_VEG],
-    complexity: 3,
-    baseTime: 80,
-    difficulty: 'medium'
-  },
-  {
-    dishType: DishType.HUANGMEN_JI_MIFAN,
-    name: '黄焖鸡米饭',
-    ingredients: [IngredientType.BRAISED_CHICKEN, IngredientType.RICE, IngredientType.GREEN_VEG],
-    complexity: 3,
-    baseTime: 70,
-    difficulty: 'medium'
-  }
-];
+import { DISH_RECIPES, getRandomRecipeByDifficulty, getRecipeByDishType } from '../data/dishRecipes';
 
 export class OrderManager {
   private scene: MainScene;
@@ -84,8 +14,28 @@ export class OrderManager {
   private maxOrders = 4; // 最大订单数量
   private orderIdCounter = 0;
   private lastOrderTime = 0;
-  private orderGenerationInterval = 8000; // 8秒生成一个新订单
-  
+  private orderGenerationInterval = 8000; // 默认8秒生成一个新订单
+
+  // 第五阶段：难度系统
+  private gameDifficulty: 'simple' | 'medium' | 'hard' = 'simple';
+  private difficultySettings = {
+    simple: {
+      interval: 30000, // 30秒生成一个订单
+      scoreMultiplier: 1,
+      timeMultiplier: 1.2 // 简单模式给更多时间
+    },
+    medium: {
+      interval: 20000, // 20秒生成一个订单
+      scoreMultiplier: 2,
+      timeMultiplier: 1.0 // 正常时间
+    },
+    hard: {
+      interval: 15000, // 15秒生成一个订单
+      scoreMultiplier: 3,
+      timeMultiplier: 0.8 // 困难模式时间更短
+    }
+  };
+
   // 订单时间调节因子
   private difficultyMultiplier = 1.0; // 难度乘数，随游戏进行调整
   private timeMultiplier = 1000; // 将秒转为毫秒
@@ -199,26 +149,30 @@ export class OrderManager {
     this.updateOrderQueueUI();
   }
 
-  private generateRandomOrder(): void {
-    // 根据游戏进行时间调整难度
-    const gameTime = this.scene.time.now;
-    const difficultyLevel = Math.floor(gameTime / 60000); // 每分钟增加难度
+  // 第五阶段：设置游戏难度
+  public setDifficulty(difficulty: 'simple' | 'medium' | 'hard'): void {
+    this.gameDifficulty = difficulty;
+    this.orderGenerationInterval = this.difficultySettings[difficulty].interval;
+    console.log(`🎯 难度设置为: ${difficulty}`);
+    console.log(`📅 订单生成间隔: ${this.orderGenerationInterval / 1000}秒`);
+  }
 
-    // 选择合适的菜品（早期游戏偏向简单菜品）
-    let availableRecipes = DISH_RECIPES;
-    if (difficultyLevel < 1) {
-      availableRecipes = DISH_RECIPES.filter(recipe => recipe.difficulty === 'simple');
-    } else if (difficultyLevel < 3) {
-      availableRecipes = DISH_RECIPES.filter(recipe => 
-        recipe.difficulty === 'simple' || recipe.difficulty === 'medium'
-      );
+  // 第五阶段：获取当前难度的分数倍率
+  public getScoreMultiplier(): number {
+    return this.difficultySettings[this.gameDifficulty].scoreMultiplier;
+  }
+
+  private generateRandomOrder(): void {
+    // 第五阶段：根据设置的难度选择菜品
+    const recipe = getRandomRecipeByDifficulty(this.gameDifficulty);
+    if (!recipe) {
+      console.error(`没有找到难度为 ${this.gameDifficulty} 的菜品配方`);
+      return;
     }
 
-    const recipe = availableRecipes[Math.floor(Math.random() * availableRecipes.length)];
-    
-    // 计算订单时间（基础时间 + 复杂度加成 + 难度调节）
-    const timeMultiplier = Math.max(0.6, 1.2 - (difficultyLevel * 0.1)); // 随时间降低时间限制
-    const totalTime = recipe.baseTime * timeMultiplier * this.timeMultiplier;
+    // 计算订单时间（基础时间 + 难度调节）
+    const currentDifficultySettings = this.difficultySettings[this.gameDifficulty];
+    const totalTime = recipe.baseTime * currentDifficultySettings.timeMultiplier * this.timeMultiplier;
 
     const order: Order = {
       id: `order_${++this.orderIdCounter}`,
@@ -228,21 +182,24 @@ export class OrderManager {
       totalTime,
       remainingTime: totalTime,
       createdAt: this.scene.time.now,
-      baseScore: recipe.complexity * 100 // 基础分数基于复杂度
+      baseScore: recipe.complexity * 100 * currentDifficultySettings.scoreMultiplier // 基础分数基于复杂度和难度倍率
     };
 
     // 新订单插入到队列最前面（最左边）
     this.orders.unshift(order);
-    console.log(`🆕 新订单生成: ${order.dishName} (${Math.round(totalTime/1000)}秒)`);
-    
+    console.log(`🆕 新订单生成: ${order.dishName} (${Math.round(totalTime/1000)}秒, 难度: ${this.gameDifficulty})`);
+
     // 触发新订单音效或动画
     this.onNewOrder(order);
   }
 
   private onNewOrder(order: Order): void {
-    // 可以在这里添加音效播放
-    // this.scene.sound.play('newOrder');
-    
+    // 第六阶段：播放新订单音效
+    const soundManager = this.scene.getSoundManager();
+    if (soundManager) {
+      soundManager.playNewOrder();
+    }
+
     // 在控制台显示新订单信息
     const recipe = this.getRecipeByType(order.dishType);
     if (recipe) {
@@ -254,9 +211,18 @@ export class OrderManager {
     console.log(`⏰ 订单超时: ${order.dishName}`);
     // 扣除分数或增加惩罚
     this.scene.updateScore(-50); // 扣除50分
-    
-    // 可以在这里添加失败音效
-    // this.scene.sound.play('orderExpired');
+
+    // 第六阶段：通知贾老板订单超时
+    const bossJiaManager = this.scene.getBossJiaManager();
+    if (bossJiaManager) {
+      bossJiaManager.urgeForExpiredOrder();
+    }
+
+    // 第六阶段：播放失败音效
+    const soundManager = this.scene.getSoundManager();
+    if (soundManager) {
+      soundManager.playError();
+    }
   }
 
   // 完成订单
@@ -283,6 +249,18 @@ export class OrderManager {
     console.log(`✅ 订单完成: ${order.dishName} (+${totalScore}分)`);
     console.log(`⏱️  剩余时间: ${Math.round(order.remainingTime/1000)}秒 (+${timeBonus}分时间奖励)`);
 
+    // 第六阶段：通知贾老板订单完成
+    const bossJiaManager = this.scene.getBossJiaManager();
+    if (bossJiaManager) {
+      bossJiaManager.encourageForCompletedOrder(totalScore);
+    }
+
+    // 第六阶段：播放成功音效
+    const soundManager = this.scene.getSoundManager();
+    if (soundManager) {
+      soundManager.playSuccess();
+    }
+
     return true;
   }
 
@@ -295,7 +273,7 @@ export class OrderManager {
 
   // 获取订单配方
   getRecipeByType(dishType: DishType): DishRecipe | undefined {
-    return DISH_RECIPES.find(recipe => recipe.dishType === dishType);
+    return getRecipeByDishType(dishType);
   }
 
   // 获取食材中文名
@@ -453,8 +431,5 @@ export class OrderManager {
     return [...this.orders];
   }
 
-  // 设置难度（用于游戏平衡调节）
-  setDifficulty(multiplier: number): void {
-    this.difficultyMultiplier = multiplier;
-  }
+  // 旧的设置难度方法已被第五阶段的新方法替代
 }

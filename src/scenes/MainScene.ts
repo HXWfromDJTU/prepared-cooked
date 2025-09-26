@@ -3,6 +3,9 @@ import { MapManager } from '../managers/MapManager';
 import { ItemManager } from '../managers/ItemManager';
 import { OrderManager } from '../managers/OrderManager';
 import { PlateManager } from '../managers/PlateManager';
+import { BossJiaManager } from '../managers/BossJiaManager'; // 第六阶段：贾老板管理器
+import { LeaderboardManager } from '../managers/LeaderboardManager'; // 第六阶段：排行榜管理器
+import { SoundManager } from '../managers/SoundManager'; // 第六阶段：音效管理器
 import { Player } from '../entities/Player';
 import { TileType, IngredientType, ItemType, ItemLocation, DishType, ItemState } from '../types';
 
@@ -12,6 +15,8 @@ export class MainScene extends Phaser.Scene {
   private itemManager!: ItemManager;
   private orderManager!: OrderManager;
   private plateManager!: PlateManager; // 第四阶段：盘子管理器
+  private bossJiaManager!: BossJiaManager; // 第六阶段：贾老板管理器
+  private soundManager!: SoundManager; // 第六阶段：音效管理器
   private player!: Player;
   private gameWidth: number = 800;
   private gameHeight: number = 600;
@@ -28,6 +33,9 @@ export class MainScene extends Phaser.Scene {
   private isGameActive: boolean = true;
   private gameEndUI: Phaser.GameObjects.Container | null = null;
 
+  // 第六阶段：当前游戏难度
+  private currentDifficulty: 'simple' | 'medium' | 'hard' = 'simple';
+
   constructor() {
     super({ key: 'MainScene' });
   }
@@ -36,22 +44,34 @@ export class MainScene extends Phaser.Scene {
     // MVP-1阶段不需要加载任何资源，使用纯色几何图形
   }
 
-  create(): void {
+  create(data?: { difficulty?: 'simple' | 'medium' | 'hard' }): void {
     // 设置世界边界
     this.physics.world.setBounds(0, 0, this.gameWidth, this.gameHeight);
 
     // 创建地图管理器
     this.mapManager = new MapManager(this);
-    
+
     // 创建物品管理器
     this.itemManager = new ItemManager(this);
-    
+
     // 创建订单管理器
     this.orderManager = new OrderManager(this);
-    
+
+    // 第五阶段：设置游戏难度
+    const difficulty = data?.difficulty || 'simple';
+    this.currentDifficulty = difficulty; // 第六阶段：保存当前难度
+    this.orderManager.setDifficulty(difficulty);
+    console.log(`🎯 游戏难度设置为: ${difficulty}`);
+
     // 第四阶段：创建盘子管理器
     this.plateManager = new PlateManager(this);
-    
+
+    // 第六阶段：创建贾老板管理器
+    this.bossJiaManager = new BossJiaManager(this);
+
+    // 第六阶段：创建音效管理器
+    this.soundManager = new SoundManager();
+
     // 渲染地图
     this.mapManager.renderMap();
 
@@ -79,6 +99,9 @@ export class MainScene extends Phaser.Scene {
     // 第三阶段：启动游戏计时
     this.startGameTimer();
 
+    // 第六阶段：播放游戏开始音效
+    this.soundManager.playGameStart();
+
     console.log('MVP-3: 主场景创建完成');
     console.log('- 使用 WASD 或方向键移动');
     console.log('- 使用 空格键 与面向的设备交互');
@@ -100,7 +123,10 @@ export class MainScene extends Phaser.Scene {
       
       // 更新订单系统
       this.orderManager.update(currentTime);
-      
+
+      // 第六阶段：更新贾老板系统
+      this.bossJiaManager.update(currentTime);
+
       // 更新微波炉进度条UI
       this.updateMicrowaveUI();
       
@@ -713,12 +739,24 @@ export class MainScene extends Phaser.Scene {
     this.isGameActive = false;
     console.log('🏁 游戏结束！');
     console.log(`📊 最终分数：${this.score}`);
-    
+
+    // 第六阶段：保存分数到排行榜
+    LeaderboardManager.addScore(this.score, this.currentDifficulty);
+
+    // 检查是否创造新纪录
+    const isNewRecord = LeaderboardManager.isNewRecord(this.score, this.currentDifficulty);
+    if (isNewRecord) {
+      console.log('🎉 恭喜！创造了新纪录！');
+    }
+
+    // 第六阶段：播放游戏结束音效
+    this.soundManager.playGameEnd();
+
     // 显示游戏结束界面
-    this.showGameEndUI();
+    this.showGameEndUI(isNewRecord);
   }
 
-  private showGameEndUI(): void {
+  private showGameEndUI(isNewRecord: boolean = false): void {
     // 创建游戏结束遮罩
     const gameEndOverlay = document.createElement('div');
     gameEndOverlay.id = 'game-end-overlay';
@@ -753,10 +791,18 @@ export class MainScene extends Phaser.Scene {
     const stars = this.calculateStars(this.score);
     const starDisplay = '⭐'.repeat(stars) + '☆'.repeat(3 - stars);
 
+    // 第六阶段：添加新纪录和难度信息
+    const difficultyNames = { simple: '简单', medium: '中等', hard: '困难' };
+    const newRecordHTML = isNewRecord
+      ? '<div style="font-size: 18px; color: #f39c12; margin: 10px 0;">🎉 新纪录！</div>'
+      : '';
+
     endPanel.innerHTML = `
       <h2 style="color: #3498db; margin: 0 0 20px 0; font-size: 24px;">🏁 游戏结束！</h2>
       <div style="font-size: 48px; color: #e74c3c; margin: 20px 0;">${this.score}</div>
       <div style="font-size: 18px; margin: 10px 0;">最终分数</div>
+      ${newRecordHTML}
+      <div style="font-size: 14px; color: #bdc3c7; margin: 5px 0;">难度: ${difficultyNames[this.currentDifficulty]}</div>
       <div style="font-size: 32px; margin: 20px 0;">${starDisplay}</div>
       <div style="font-size: 14px; color: #bdc3c7; margin: 20px 0;">
         ${this.getScoreComment(this.score)}
@@ -783,6 +829,17 @@ export class MainScene extends Phaser.Scene {
         margin: 10px;
         transition: background-color 0.3s;
       ">📋 主菜单</button>
+      <button id="leaderboard-btn" style="
+        background-color: #f39c12;
+        color: white;
+        border: none;
+        padding: 12px 24px;
+        font-size: 16px;
+        border-radius: 8px;
+        cursor: pointer;
+        margin: 10px;
+        transition: background-color 0.3s;
+      ">🏆 排行榜</button>
     `;
 
     // 添加按钮事件
@@ -803,17 +860,31 @@ export class MainScene extends Phaser.Scene {
       });
     }
 
-    // 主菜单按钮（暂时也是重新开始）
+    // 主菜单按钮（第五阶段：返回主菜单）
     const menuBtn = document.getElementById('menu-btn');
     if (menuBtn) {
       menuBtn.addEventListener('click', () => {
-        this.restartGame();
+        this.returnToMenu();
       });
       menuBtn.addEventListener('mouseenter', () => {
         menuBtn.style.backgroundColor = '#7f8c8d';
       });
       menuBtn.addEventListener('mouseleave', () => {
         menuBtn.style.backgroundColor = '#95a5a6';
+      });
+    }
+
+    // 第六阶段：排行榜按钮
+    const leaderboardBtn = document.getElementById('leaderboard-btn');
+    if (leaderboardBtn) {
+      leaderboardBtn.addEventListener('click', () => {
+        LeaderboardManager.showLeaderboard();
+      });
+      leaderboardBtn.addEventListener('mouseenter', () => {
+        leaderboardBtn.style.backgroundColor = '#e67e22';
+      });
+      leaderboardBtn.addEventListener('mouseleave', () => {
+        leaderboardBtn.style.backgroundColor = '#f39c12';
       });
     }
 
@@ -882,6 +953,19 @@ export class MainScene extends Phaser.Scene {
     this.player.resetToGridPosition(7, 7);
 
     console.log('🔄 游戏重新开始！');
+  }
+
+  // 第五阶段：返回主菜单
+  private returnToMenu(): void {
+    // 移除游戏结束UI
+    const overlay = document.getElementById('game-end-overlay');
+    if (overlay) {
+      overlay.remove();
+    }
+
+    // 返回菜单场景
+    this.scene.start('MenuScene');
+    console.log('🏠 返回主菜单');
   }
 
   // 获取物品名称
@@ -1047,6 +1131,21 @@ export class MainScene extends Phaser.Scene {
   // 获取ItemManager实例（供OrderManager调用）
   getItemManager(): ItemManager {
     return this.itemManager;
+  }
+
+  // 第六阶段：获取OrderManager实例（供BossJiaManager调用）
+  getOrderManager(): OrderManager {
+    return this.orderManager;
+  }
+
+  // 第六阶段：获取BossJiaManager实例（供OrderManager调用）
+  getBossJiaManager(): BossJiaManager {
+    return this.bossJiaManager;
+  }
+
+  // 第六阶段：获取SoundManager实例（供其他管理器调用）
+  getSoundManager(): SoundManager {
+    return this.soundManager;
   }
 
 

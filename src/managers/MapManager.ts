@@ -103,20 +103,20 @@ export class MapManager {
   private placeIngredients(): void {
     // 食材存储格是障碍物！厨师不能踩上去，但可以从旁边获取食材
     // 设计原则：每个食材格周围至少有一面是地面，确保可以获取
-    
-    // 左侧食材区域
-    this.setTile(0, 5, TileType.INGREDIENT, false, false, IngredientType.HUANG_MI_GAOOU);
-    this.setTile(0, 6, TileType.INGREDIENT, false, false, IngredientType.MANTOU);
-    this.setTile(0, 7, TileType.INGREDIENT, false, false, IngredientType.XIBEI_MIANJIN);
-    this.setTile(0, 8, TileType.INGREDIENT, false, false, IngredientType.FANQIE_NIUROU);
-    this.setTile(0, 9, TileType.INGREDIENT, false, false, IngredientType.RICE);
-    
-    // 右侧食材区域
-    this.setTile(19, 5, TileType.INGREDIENT, false, false, IngredientType.MANGYUE_SAUCE);
-    this.setTile(19, 6, TileType.INGREDIENT, false, false, IngredientType.SEASONING_SAUCE);
-    this.setTile(19, 7, TileType.INGREDIENT, false, false, IngredientType.SOUP_PACK);
-    this.setTile(19, 8, TileType.INGREDIENT, false, false, IngredientType.NOODLES);
-    this.setTile(19, 9, TileType.INGREDIENT, false, false, IngredientType.TOPPINGS);
+
+    // 左侧食材区域（第五阶段：更新为新配方需要的食材）
+    this.setTile(0, 5, TileType.INGREDIENT, false, false, IngredientType.HUANG_MI_GAOOU); // 黄米凉糕
+    this.setTile(0, 6, TileType.INGREDIENT, false, false, IngredientType.FANQIE_NIUROU);  // 番茄牛腩饭
+    this.setTile(0, 7, TileType.INGREDIENT, false, false, IngredientType.RICE);           // 番茄牛腩饭
+    this.setTile(0, 8, TileType.INGREDIENT, false, false, IngredientType.BEEF_BONE);      // 牛大骨套餐
+    this.setTile(0, 9, TileType.INGREDIENT, false, false, IngredientType.YOUMIAN_YUYU);   // 牛大骨套餐
+
+    // 右侧食材区域（第五阶段：第三种食材）
+    this.setTile(19, 5, TileType.INGREDIENT, false, false, IngredientType.GREEN_VEG);     // 牛大骨套餐
+    this.setTile(19, 6, TileType.INGREDIENT, false, false, IngredientType.MANTOU);        // 备用食材
+    this.setTile(19, 7, TileType.INGREDIENT, false, false, IngredientType.XIBEI_MIANJIN); // 备用食材
+    this.setTile(19, 8, TileType.INGREDIENT, false, false, IngredientType.NOODLES);       // 备用食材
+    this.setTile(19, 9, TileType.INGREDIENT, false, false, IngredientType.SOUP_PACK);     // 备用食材
   }
 
   private setTile(x: number, y: number, type: TileType, isWalkable: boolean, canPlaceItems: boolean, ingredientType?: IngredientType): void {
@@ -294,6 +294,16 @@ export class MapManager {
         return '挂面';
       case IngredientType.TOPPINGS:
         return '浇头';
+      case IngredientType.BEEF_BONE:
+        return '牛大骨';
+      case IngredientType.YOUMIAN_YUYU:
+        return '莜面鱼';
+      case IngredientType.GREEN_VEG:
+        return '青菜';
+      case IngredientType.SIDE_DISHES:
+        return '小菜';
+      case IngredientType.BRAISED_CHICKEN:
+        return '黄焖鸡';
       default:
         return '';
     }

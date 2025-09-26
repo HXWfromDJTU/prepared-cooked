@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { MainScene } from './scenes';
+import { MenuScene } from './scenes/MenuScene';
 
 // 游戏配置
 const config: Phaser.Types.Core.GameConfig = {
@@ -15,7 +16,7 @@ const config: Phaser.Types.Core.GameConfig = {
       debug: false
     }
   },
-  scene: [MainScene],
+  scene: [MenuScene, MainScene],
   scale: {
     mode: Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH
@@ -28,5 +29,5 @@ const game = new Phaser.Game(config);
 // 全局游戏实例，方便调试
 (window as any).game = game;
 
-console.log('《预制菜厨房》MVP-1 启动完成！');
-console.log('使用 WASD 键控制角色移动');
+console.log('《预制菜厨房》第五阶段 启动完成！');
+console.log('选择难度开始游戏');
